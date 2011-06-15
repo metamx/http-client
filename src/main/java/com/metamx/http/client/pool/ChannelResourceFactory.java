@@ -30,7 +30,9 @@ public class ChannelResourceFactory implements ResourceFactory<String, Channel>
 {
   private final ClientBootstrap bootstrap;
 
-  public ChannelResourceFactory(ClientBootstrap bootstrap) {this.bootstrap = bootstrap;}
+  public ChannelResourceFactory(ClientBootstrap bootstrap) {
+    this.bootstrap = bootstrap;
+  }
 
   @Override
   public Channel generate(String hostname)

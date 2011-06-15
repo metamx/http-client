@@ -125,7 +125,8 @@ public class ResourcePool<K, V>
       }
 
       if (!factory.isGood(retVal)) {
-        // If current object is no good, make a new one.
+        // If current object is no good, close it and make a new one.
+        factory.close(retVal);
         return factory.generate(key);
       }
 
@@ -153,6 +154,7 @@ public class ResourcePool<K, V>
         }
 
         objectList.addLast(object);
+        this.notifyAll();
       }
     }
 
