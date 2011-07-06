@@ -18,6 +18,7 @@ package com.metamx.http.client;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.response.ClientResponse;
 import com.metamx.http.client.response.HttpResponseHandler;
@@ -106,7 +107,8 @@ public class HttpClient
   )
   {
     final String hostKey = getPoolKey(url);
-    final Channel channel = pool.take(hostKey);
+    final ResourceContainer<Channel> channelResourceContainer = pool.take(hostKey);
+    final Channel channel = channelResourceContainer.get();
 
     HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.toString());
 
@@ -174,7 +176,7 @@ public class HttpClient
                 retVal.set(null);
               }
               channel.close();
-              pool.giveBack(hostKey, channel);
+              channelResourceContainer.returnResource();
 
               throw ex;
             }
@@ -194,7 +196,7 @@ public class HttpClient
               retVal.set(finalResponse.getObj());
             }
             channel.getPipeline().removeLast();
-            pool.giveBack(hostKey, channel);
+            channelResourceContainer.returnResource();
           }
         }
     );

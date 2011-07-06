@@ -16,40 +16,28 @@
 
 package com.metamx.http.client.response;
 
+import com.google.common.base.Charsets;
 import org.apache.log4j.Logger;
 import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpResponse;
+
+import java.nio.charset.Charset;
 
 /**
  */
 public class ToStringResponseHandler implements HttpResponseHandler<StringBuilder, String>
 {
-  private static final Logger log = Logger.getLogger(ToStringResponseHandler.class);
-  StringBuilder bob = new StringBuilder();
-  private final String url;
+  private final Charset charset;
 
-  public ToStringResponseHandler(String url)
+  public ToStringResponseHandler(Charset charset)
   {
-    this.url = url;
+    this.charset = charset;
   }
 
   @Override
   public ClientResponse<StringBuilder> handleResponse(HttpResponse response)
   {
-    long newStartTime = System.currentTimeMillis();
-
-    int statusCode = response.getStatus().getCode();
-
-    if (statusCode / 100 == 2) {
-      return ClientResponse.unfinished(new StringBuilder(new String(response.getContent().array())));
-    }
-
-    log.error(
-        String.format(
-            "Error status code[%s:%s] talking to [%s]", statusCode, response.getStatus().getReasonPhrase(), url
-        )
-    );
-    return ClientResponse.finished(null);
+    return ClientResponse.unfinished(new StringBuilder(response.getContent().toString(charset)));
   }
 
   @Override
@@ -58,18 +46,13 @@ public class ToStringResponseHandler implements HttpResponseHandler<StringBuilde
       HttpChunk chunk
   )
   {
-    response.getObj().append(new String(chunk.getContent().array()));
+    response.getObj().append(chunk.getContent().toString(charset));
     return response;
   }
 
   @Override
   public ClientResponse<String> done(ClientResponse<StringBuilder> response)
   {
-
-    if (response.getObj() == null) {
-      return ClientResponse.finished(null);
-    }
-
     return ClientResponse.finished(response.getObj().toString());
   }
 }

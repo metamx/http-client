@@ -17,16 +17,18 @@
 package com.metamx.http.client.pool;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.MapMaker;
 import org.apache.log4j.Logger;
 
+import java.io.Closeable;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  */
-public class ResourcePool<K, V>
+public class ResourcePool<K, V> implements Closeable
 {
   private static final Logger log = Logger.getLogger(ResourcePool.class);
   private final ConcurrentMap<K, ImmediateCreationResourceHolder<K, V>> pool;
@@ -53,19 +55,52 @@ public class ResourcePool<K, V>
     );
   }
 
-  public V take(K k)
+  public ResourceContainer<V> take(final K key)
   {
     if (closed.get()) {
-      log.error(String.format("take(%s) called even though I'm closed.", k));
+      log.error(String.format("take(%s) called even though I'm closed.", key));
       return null;
     }
 
-    return pool.get(k).get();
-  }
+    final V value = pool.get(key).get();
 
-  public void giveBack(K key, V value)
-  {
-    pool.get(key).giveBack(value);
+    return new ResourceContainer<V>()
+    {
+      private final AtomicBoolean returned = new AtomicBoolean(false);
+
+      @Override
+      public V get()
+      {
+        Preconditions.checkState(!returned.get(), "Resource for key[%s] has been returned, cannot get().", key);
+        return value;
+      }
+
+      @Override
+      public void returnResource()
+      {
+        if (returned.getAndSet(true)) {
+          log.warn(String.format("Resource at key[%s] was returned multiple times?", key));
+        } else {
+          pool.get(key).giveBack(value);
+        }
+      }
+
+      @Override
+      protected void finalize() throws Throwable
+      {
+        if (!returned.get()) {
+          log.warn(
+              String.format(
+                  "Resource[%s] at key[%s] was not returned before Container was finalized, potential resource leak.",
+                  value,
+                  key
+              )
+          );
+          returnResource();
+        }
+        super.finalize();
+      }
+    };
   }
 
   public void close()
@@ -143,13 +178,23 @@ public class ResourcePool<K, V>
         }
 
         if (objectList.size() >= maxSize) {
-          log.warn(
-              String.format(
-                  "Returning object[%s] at key[%s] even though we already have all that we can hold!? Skipping",
-                  object,
-                  key
-              )
-          );
+          if (objectList.contains(object)) {
+            log.warn(
+                String.format(
+                    "Returning object[%s] at key[%s] that has already been returned!? Skipping",
+                    object,
+                    key
+                )
+            );
+          } else {
+            log.warn(
+                String.format(
+                    "Returning object[%s] at key[%s] even though we already have all that we can hold!? Skipping",
+                    object,
+                    key
+                )
+            );
+          }
           return;
         }
 

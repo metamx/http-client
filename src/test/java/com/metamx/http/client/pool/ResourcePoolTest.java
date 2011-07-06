@@ -53,16 +53,16 @@ public class ResourcePoolTest
     EasyMock.expect(resourceFactory.isGood("sally0")).andReturn(true).times(1);
     EasyMock.replay(resourceFactory);
 
-    String billyString = pool.take("billy");
-    String sallyString = pool.take("sally");
-    Assert.assertEquals("billy0", billyString);
-    Assert.assertEquals("sally0", sallyString);
+    ResourceContainer<String> billyString = pool.take("billy");
+    ResourceContainer<String> sallyString = pool.take("sally");
+    Assert.assertEquals("billy0", billyString.get());
+    Assert.assertEquals("sally0", sallyString.get());
 
     EasyMock.verify(resourceFactory);
     EasyMock.reset(resourceFactory);
 
-    pool.giveBack("billy", billyString);
-    pool.giveBack("sally", sallyString);
+    billyString.returnResource();
+    sallyString.returnResource();
   }
 
   @Test
@@ -76,8 +76,9 @@ public class ResourcePoolTest
     EasyMock.expect(resourceFactory.generate("billy")).andReturn("billy2").times(1);
     EasyMock.replay(resourceFactory);
 
-    Assert.assertEquals("billy2", pool.take("billy"));
-    pool.giveBack("billy", "billy2");
+    ResourceContainer<String> billy = pool.take("billy");
+    Assert.assertEquals("billy2", billy.get());
+    billy.returnResource();
   }
 
   @Test
@@ -154,7 +155,8 @@ public class ResourcePoolTest
     @Override
     public void run()
     {
-      value = pool.take(resourceName);
+      ResourceContainer<String> resourceContainer = pool.take(resourceName);
+      value = resourceContainer.get();
       gotValueLatch.countDown();
       try {
         latch1.await();
@@ -162,7 +164,7 @@ public class ResourcePoolTest
       catch (InterruptedException e) {
 
       }
-      pool.giveBack(resourceName, value);
+      resourceContainer.returnResource();
     }
 
     public String getValue()
