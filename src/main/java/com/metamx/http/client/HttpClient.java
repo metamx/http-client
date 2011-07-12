@@ -219,7 +219,7 @@ public class HttpClient
     );
   }
 
-  public static HttpClient defaultInstance(int numConnections)
+  public static HttpClient createDefaultInstance(int numConnections)
   {
     final ClientBootstrap bootstrap = new ClientBootstrap(
         new NioClientSocketChannelFactory(
