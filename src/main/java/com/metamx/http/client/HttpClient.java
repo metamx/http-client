@@ -18,16 +18,21 @@ package com.metamx.http.client;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.metamx.http.client.pool.ChannelResourceFactory;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
+import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.ClientResponse;
 import com.metamx.http.client.response.HttpResponseHandler;
 import org.apache.log4j.Logger;
+import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
+import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.DefaultHttpRequest;
 import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
@@ -39,6 +44,7 @@ import org.jboss.netty.handler.codec.http.HttpVersion;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
@@ -212,4 +218,33 @@ public class HttpClient
         "%s://%s:%s", url.getProtocol(), url.getHost(), url.getPort() == -1 ? url.getDefaultPort() : url.getPort()
     );
   }
+
+  public static HttpClient defaultInstance(int numConnections)
+  {
+    final ClientBootstrap bootstrap = new ClientBootstrap(
+        new NioClientSocketChannelFactory(
+            Executors.newCachedThreadPool(
+                new ThreadFactoryBuilder()
+                    .setDaemon(true)
+                    .setNameFormat("Netty-Boss-%s")
+                    .build()
+            ),
+            Executors.newCachedThreadPool(
+                new ThreadFactoryBuilder()
+                    .setDaemon(true)
+                    .setNameFormat("Netty-Worker-%s")
+                    .build()
+            )
+        )
+    );
+    bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
+
+    return new HttpClient(
+        new ResourcePool<String, Channel>(
+            new ChannelResourceFactory(bootstrap),
+            new ResourcePoolConfig(numConnections, false)
+        )
+    );
+  }
+
 }
