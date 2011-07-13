@@ -29,6 +29,7 @@ import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -53,10 +54,10 @@ public class HttpClient
 {
   private static final Logger log = Logger.getLogger(HttpClient.class);
 
-  private final ResourcePool<String, Channel> pool;
+  private final ResourcePool<String, ChannelFuture> pool;
 
   public HttpClient(
-      ResourcePool<String, Channel> pool
+      ResourcePool<String, ChannelFuture> pool
   )
   {
     this.pool = pool;
@@ -113,8 +114,8 @@ public class HttpClient
   )
   {
     final String hostKey = getPoolKey(url);
-    final ResourceContainer<Channel> channelResourceContainer = pool.take(hostKey);
-    final Channel channel = channelResourceContainer.get();
+    final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
+    final Channel channel = channelResourceContainer.get().awaitUninterruptibly().getChannel();
 
     HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.toString());
 
@@ -240,7 +241,7 @@ public class HttpClient
     bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
 
     return new HttpClient(
-        new ResourcePool<String, Channel>(
+        new ResourcePool<String, ChannelFuture>(
             new ChannelResourceFactory(bootstrap),
             new ResourcePoolConfig(numConnections, false)
         )

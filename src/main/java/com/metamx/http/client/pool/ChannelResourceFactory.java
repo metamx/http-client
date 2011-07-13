@@ -23,10 +23,11 @@ import org.jboss.netty.channel.ChannelFuture;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.concurrent.Future;
 
 /**
 */
-public class ChannelResourceFactory implements ResourceFactory<String, Channel>
+public class ChannelResourceFactory implements ResourceFactory<String, ChannelFuture>
 {
   private final ClientBootstrap bootstrap;
 
@@ -35,7 +36,7 @@ public class ChannelResourceFactory implements ResourceFactory<String, Channel>
   }
 
   @Override
-  public Channel generate(String hostname)
+  public ChannelFuture generate(String hostname)
   {
     URL url = null;
     try {
@@ -45,26 +46,24 @@ public class ChannelResourceFactory implements ResourceFactory<String, Channel>
       throw new RuntimeException(e);
     }
 
-    ChannelFuture channelFuture = bootstrap.connect(
+    return bootstrap.connect(
         new InetSocketAddress(
             url.getHost(), url.getPort() == -1 ? url.getDefaultPort() : url.getPort()
         )
     );
-
-    Channel channel = channelFuture.awaitUninterruptibly().getChannel();
-
-    return channel;
   }
 
   @Override
-  public boolean isGood(Channel resource)
+  public boolean isGood(ChannelFuture resource)
   {
-    return resource.isConnected() && resource.isOpen();
+    Channel channel = resource.awaitUninterruptibly().getChannel();
+
+    return channel.isConnected() && channel.isOpen();
   }
 
   @Override
-  public void close(Channel resource)
+  public void close(ChannelFuture resource)
   {
-    resource.close();
+    resource.awaitUninterruptibly().getChannel().close();
   }
 }
