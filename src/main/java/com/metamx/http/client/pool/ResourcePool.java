@@ -184,7 +184,8 @@ public class ResourcePool<K, V> implements Closeable
                     "Returning object[%s] at key[%s] that has already been returned!? Skipping",
                     object,
                     key
-                )
+                ),
+                new Exception("Exception for stacktrace")
             );
           } else {
             log.warn(
@@ -192,7 +193,8 @@ public class ResourcePool<K, V> implements Closeable
                     "Returning object[%s] at key[%s] even though we already have all that we can hold!? Skipping",
                     object,
                     key
-                )
+                ),
+                new Exception("Exception for stacktrace")
             );
           }
           return;
