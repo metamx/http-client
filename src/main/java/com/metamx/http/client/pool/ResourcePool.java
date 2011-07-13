@@ -62,7 +62,8 @@ public class ResourcePool<K, V> implements Closeable
       return null;
     }
 
-    final V value = pool.get(key).get();
+    final ImmediateCreationResourceHolder<K, V> holder = pool.get(key);
+    final V value = holder.get();
 
     return new ResourceContainer<V>()
     {
@@ -81,7 +82,7 @@ public class ResourcePool<K, V> implements Closeable
         if (returned.getAndSet(true)) {
           log.warn(String.format("Resource at key[%s] was returned multiple times?", key));
         } else {
-          pool.get(key).giveBack(value);
+          holder.giveBack(value);
         }
       }
 
