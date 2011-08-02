@@ -220,7 +220,7 @@ public class HttpClient
     );
   }
 
-  public static HttpClient createDefaultInstance(int numConnections)
+  public static ClientBootstrap createDefaultBootstrap()
   {
     final ClientBootstrap bootstrap = new ClientBootstrap(
         new NioClientSocketChannelFactory(
@@ -240,6 +240,11 @@ public class HttpClient
     );
     bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
 
+    return bootstrap;
+  }
+
+  public static HttpClient createDefaultInstance(int numConnections, final ClientBootstrap bootstrap)
+  {
     return new HttpClient(
         new ResourcePool<String, ChannelFuture>(
             new ChannelResourceFactory(bootstrap),
