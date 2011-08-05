@@ -16,9 +16,12 @@
 
 package com.metamx.http.client;
 
+import org.apache.log4j.Logger;
+import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.DefaultChannelPipeline;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.handler.codec.http.HttpClientCodec;
 import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
 
@@ -26,13 +29,25 @@ import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
  */
 public class HttpClientPipelineFactory implements ChannelPipelineFactory
 {
+  private static final Logger log = Logger.getLogger(HttpClientPipelineFactory.class);
+
   @Override
   public ChannelPipeline getPipeline() throws Exception
   {
     ChannelPipeline pipeline = new DefaultChannelPipeline();
 
     pipeline.addLast("codec", new HttpClientCodec());
-    pipeline.addLast("inflater", new HttpContentDecompressor());
+    pipeline.addLast("inflater",
+        new HttpContentDecompressor()
+        {
+          @Override
+          public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
+          {
+            log.error("Exception in inflater: " + event.getCause());
+            event.getCause().printStackTrace();
+          }
+        }
+    );
 
     return pipeline;
   }
