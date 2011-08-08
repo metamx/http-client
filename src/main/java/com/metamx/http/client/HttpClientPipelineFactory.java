@@ -43,8 +43,8 @@ public class HttpClientPipelineFactory implements ChannelPipelineFactory
           @Override
           public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
           {
-            log.error("Exception in inflater: " + event.getCause());
-            event.getCause().printStackTrace();
+            log.warn("Exception in inflater, sending upstream: " + event.getCause(), event.getCause());
+            context.sendUpstream(event);
           }
         }
     );

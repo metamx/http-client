@@ -32,6 +32,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
@@ -205,6 +206,15 @@ public class HttpClient
             }
             channel.getPipeline().removeLast();
             channelResourceContainer.returnResource();
+          }
+
+          @Override
+          public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
+          {
+            channel.close();
+            channelResourceContainer.returnResource();
+            retVal.setException(event.getCause());
+            context.sendUpstream(event);
           }
         }
     );
