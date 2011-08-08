@@ -19,6 +19,7 @@ package com.metamx.http.client;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.util.concurrent.ValueFuture;
 import com.metamx.http.client.pool.ChannelResourceFactory;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
@@ -135,7 +136,7 @@ public class HttpClient
       request.setContent(content);
     }
 
-    final LatchedFuture<Final> retVal = new LatchedFuture<Final>();
+    final ValueFuture<Final> retVal = ValueFuture.<Final>create();
 
     channel.getPipeline().addLast(
         "last",
