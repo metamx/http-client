@@ -32,6 +32,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -55,6 +56,8 @@ import java.util.concurrent.Future;
 public class HttpClient
 {
   private static final Logger log = Logger.getLogger(HttpClient.class);
+
+  private static final String LAST_HANDLER_NAME = "last-handler";
 
   private final ResourcePool<String, ChannelFuture> pool;
 
@@ -115,6 +118,8 @@ public class HttpClient
       final HttpResponseHandler<Intermediate, Final> httpResponseHandler
   )
   {
+    final String requestDesc = String.format("%s %s", method, url);
+    log.debug(String.format("[%s] starting", requestDesc));
     final String hostKey = getPoolKey(url);
     final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
     final Channel channel = channelResourceContainer.get().awaitUninterruptibly().getChannel();
@@ -140,7 +145,7 @@ public class HttpClient
     final ValueFuture<Final> retVal = ValueFuture.<Final>create();
 
     channel.getPipeline().addLast(
-        "last",
+        LAST_HANDLER_NAME,
         new SimpleChannelUpstreamHandler()
         {
           private volatile ClientResponse<Intermediate> response = null;
@@ -148,11 +153,13 @@ public class HttpClient
           @Override
           public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception
           {
+            log.debug(String.format("[%s] messageReceived: %s", requestDesc, e.getMessage()));
             try {
               Object msg = e.getMessage();
 
               if (msg instanceof HttpResponse) {
                 HttpResponse httpResponse = (HttpResponse) msg;
+                log.debug(String.format("[%s] Got response: %s", requestDesc, httpResponse.getStatus()));
 
                 response = httpResponseHandler.handleResponse(httpResponse);
                 if (response.isFinished()) {
@@ -164,6 +171,12 @@ public class HttpClient
                 }
               } else if (msg instanceof HttpChunk) {
                 HttpChunk httpChunk = (HttpChunk) msg;
+                log.debug(String.format(
+                    "[%s] Got chunk: %sB, last=%s",
+                    requestDesc,
+                    httpChunk.getContent().readableBytes(),
+                    httpChunk.isLast()
+                ));
 
                 if (httpChunk.isLast()) {
                   finishRequest();
@@ -179,7 +192,9 @@ public class HttpClient
               }
             }
             catch (Exception ex) {
-              log.warn("Exception thrown while processing message, closing channel.", ex);
+              log.warn(String.format(
+                  "[%s] Exception thrown while processing message, closing channel.", requestDesc, ex
+              ));
 
               if (!retVal.isDone()) {
                 retVal.set(null);
@@ -197,20 +212,23 @@ public class HttpClient
             if (!finalResponse.isFinished()) {
               throw new IllegalStateException(
                   String.format(
-                      "Didn't get a completed ClientResponse Object from [%s]", httpResponseHandler.getClass()
+                      "[%s] Didn't get a completed ClientResponse Object from [%s]",
+                      requestDesc,
+                      httpResponseHandler.getClass()
                   )
               );
             }
             if (!retVal.isDone()) {
               retVal.set(finalResponse.getObj());
             }
-            channel.getPipeline().removeLast();
+            channel.getPipeline().remove(LAST_HANDLER_NAME);
             channelResourceContainer.returnResource();
           }
 
           @Override
           public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
           {
+            log.debug(String.format("[%s] Caught exception, bubbling out: %s", requestDesc, event.getCause()));
             channel.close();
             channelResourceContainer.returnResource();
             retVal.setException(event.getCause());

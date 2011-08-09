@@ -24,6 +24,7 @@ import org.jboss.netty.channel.DefaultChannelPipeline;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.handler.codec.http.HttpClientCodec;
 import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
+import org.jboss.netty.handler.logging.LoggingHandler;
 
 /**
  */
@@ -36,6 +37,7 @@ public class HttpClientPipelineFactory implements ChannelPipelineFactory
   {
     ChannelPipeline pipeline = new DefaultChannelPipeline();
 
+    pipeline.addLast("early logger", new LoggingHandler());
     pipeline.addLast("codec", new HttpClientCodec());
     pipeline.addLast("inflater",
         new HttpContentDecompressor()
@@ -48,6 +50,7 @@ public class HttpClientPipelineFactory implements ChannelPipelineFactory
           }
         }
     );
+    pipeline.addLast("late logger", new LoggingHandler());
 
     return pipeline;
   }
