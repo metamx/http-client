@@ -234,6 +234,19 @@ public class HttpClient
             retVal.setException(event.getCause());
             context.sendUpstream(event);
           }
+
+          @Override
+          public void channelDisconnected(ChannelHandlerContext context, ChannelStateEvent event) throws Exception
+          {
+            log.debug(String.format("[%s] Channel disconnected", requestDesc));
+            channel.close();
+            channelResourceContainer.returnResource();
+            if (!retVal.isDone()) {
+              log.warn(String.format("[%s] Channel disconnected before response complete", requestDesc));
+              retVal.setException(new RuntimeException("Channel disconnected"));
+            }
+            context.sendUpstream(event);
+          }
         }
     );
 
