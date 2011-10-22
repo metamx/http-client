@@ -20,6 +20,9 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.ValueFuture;
+import com.metamx.common.lifecycle.Lifecycle;
+import com.metamx.common.lifecycle.LifecycleStart;
+import com.metamx.common.lifecycle.LifecycleStop;
 import com.metamx.http.client.pool.ChannelResourceFactory;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
@@ -44,6 +47,8 @@ import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpVersion;
+import org.jboss.netty.logging.InternalLoggerFactory;
+import org.jboss.netty.logging.Log4JLoggerFactory;
 
 import java.net.URL;
 import java.util.Collection;
@@ -68,6 +73,12 @@ public class HttpClient
     this.pool = pool;
   }
 
+  @LifecycleStart
+  public void start()
+  {
+  }
+
+  @LifecycleStop
   public void stop()
   {
     pool.close();
@@ -262,7 +273,17 @@ public class HttpClient
     );
   }
 
-  public static ClientBootstrap createDefaultBootstrap()
+  public static HttpClient create(ResourcePoolConfig config, Lifecycle lifecycle)
+  {
+    return lifecycle.addManagedInstance(new HttpClient(
+        new ResourcePool<String, ChannelFuture>(
+            new ChannelResourceFactory(createBootstrap(lifecycle)),
+            config
+        )
+    ));
+  }
+
+  public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
   {
     final ClientBootstrap bootstrap = new ClientBootstrap(
         new NioClientSocketChannelFactory(
@@ -282,17 +303,25 @@ public class HttpClient
     );
     bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
 
-    return bootstrap;
-  }
+    InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
 
-  public static HttpClient createDefaultInstance(int numConnections, final ClientBootstrap bootstrap)
-  {
-    return new HttpClient(
-        new ResourcePool<String, ChannelFuture>(
-            new ChannelResourceFactory(bootstrap),
-            new ResourcePoolConfig(numConnections, false)
-        )
+    lifecycle.addHandler(
+        new Lifecycle.Handler()
+        {
+          @Override
+          public void start() throws Exception
+          {
+          }
+
+          @Override
+          public void stop()
+          {
+            bootstrap.releaseExternalResources();
+          }
+        }
     );
+
+    return bootstrap;
   }
 
 }
