@@ -18,8 +18,8 @@ package com.metamx.http.client;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.common.util.concurrent.ValueFuture;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
@@ -153,7 +153,7 @@ public class HttpClient
       request.setContent(content);
     }
 
-    final ValueFuture<Final> retVal = ValueFuture.<Final>create();
+    final SettableFuture<Final> retVal = SettableFuture.create();
 
     channel.getPipeline().addLast(
         LAST_HANDLER_NAME,
@@ -275,12 +275,14 @@ public class HttpClient
 
   public static HttpClient create(ResourcePoolConfig config, Lifecycle lifecycle)
   {
-    return lifecycle.addManagedInstance(new HttpClient(
-        new ResourcePool<String, ChannelFuture>(
-            new ChannelResourceFactory(createBootstrap(lifecycle)),
-            config
+    return lifecycle.addManagedInstance(
+        new HttpClient(
+            new ResourcePool<String, ChannelFuture>(
+                new ChannelResourceFactory(createBootstrap(lifecycle)),
+                config
+            )
         )
-    ));
+    );
   }
 
   public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
