@@ -130,7 +130,9 @@ public class HttpClient
   )
   {
     final String requestDesc = String.format("%s %s", method, url);
-    log.debug(String.format("[%s] starting", requestDesc));
+    if (log.isDebugEnabled()) {
+      log.debug(String.format("[%s] starting", requestDesc));
+    }
     final String hostKey = getPoolKey(url);
     final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
     final Channel channel = channelResourceContainer.get().awaitUninterruptibly().getChannel();
@@ -164,13 +166,17 @@ public class HttpClient
           @Override
           public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception
           {
-            log.debug(String.format("[%s] messageReceived: %s", requestDesc, e.getMessage()));
+            if (log.isDebugEnabled()) {
+              log.debug(String.format("[%s] messageReceived: %s", requestDesc, e.getMessage()));
+            }
             try {
               Object msg = e.getMessage();
 
               if (msg instanceof HttpResponse) {
                 HttpResponse httpResponse = (HttpResponse) msg;
-                log.debug(String.format("[%s] Got response: %s", requestDesc, httpResponse.getStatus()));
+                if (log.isDebugEnabled()) {
+                  log.debug(String.format("[%s] Got response: %s", requestDesc, httpResponse.getStatus()));
+                }
 
                 response = httpResponseHandler.handleResponse(httpResponse);
                 if (response.isFinished()) {
@@ -182,12 +188,14 @@ public class HttpClient
                 }
               } else if (msg instanceof HttpChunk) {
                 HttpChunk httpChunk = (HttpChunk) msg;
-                log.debug(String.format(
-                    "[%s] Got chunk: %sB, last=%s",
-                    requestDesc,
-                    httpChunk.getContent().readableBytes(),
-                    httpChunk.isLast()
-                ));
+                if (log.isDebugEnabled()) {
+                  log.debug(String.format(
+                      "[%s] Got chunk: %sB, last=%s",
+                      requestDesc,
+                      httpChunk.getContent().readableBytes(),
+                      httpChunk.isLast()
+                  ));
+                }
 
                 if (httpChunk.isLast()) {
                   finishRequest();
@@ -203,9 +211,9 @@ public class HttpClient
               }
             }
             catch (Exception ex) {
-              log.warn(String.format(
-                  "[%s] Exception thrown while processing message, closing channel.", requestDesc, ex
-              ));
+              log.warn(
+                  String.format("[%s] Exception thrown while processing message, closing channel.", requestDesc), ex
+              );
 
               if (!retVal.isDone()) {
                 retVal.set(null);
@@ -239,7 +247,12 @@ public class HttpClient
           @Override
           public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
           {
-            log.debug(String.format("[%s] Caught exception, bubbling out: %s", requestDesc, event.getCause()));
+            if (log.isDebugEnabled()) {
+              log.debug(
+                  String.format("[%s] Caught exception, bubbling out: %s", requestDesc, event.getCause().getMessage())
+              );
+            }
+
             channel.close();
             channelResourceContainer.returnResource();
             retVal.setException(event.getCause());
@@ -249,7 +262,10 @@ public class HttpClient
           @Override
           public void channelDisconnected(ChannelHandlerContext context, ChannelStateEvent event) throws Exception
           {
-            log.debug(String.format("[%s] Channel disconnected", requestDesc));
+            if (log.isDebugEnabled()) {
+              log.debug(String.format("[%s] Channel disconnected", requestDesc));
+            }
+
             channel.close();
             channelResourceContainer.returnResource();
             if (!retVal.isDone()) {
