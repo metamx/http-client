@@ -16,19 +16,22 @@
 
 package com.metamx.http.client;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
-import com.metamx.http.client.pool.ChannelResourceFactory;
+import com.metamx.http.client.auth.Credentials;
+import com.metamx.http.client.netty.HandshakeRememberingSslHandler;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.ClientResponse;
 import com.metamx.http.client.response.HttpResponseHandler;
+import com.metamx.http.client.response.ToStringResponseHandler;
 import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -39,7 +42,6 @@ import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.DefaultHttpRequest;
 import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
@@ -47,13 +49,14 @@ import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpVersion;
-import org.jboss.netty.logging.InternalLoggerFactory;
-import org.jboss.netty.logging.Log4JLoggerFactory;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.FileInputStream;
 import java.net.URL;
+import java.security.KeyStore;
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
@@ -65,12 +68,25 @@ public class HttpClient
   private static final String LAST_HANDLER_NAME = "last-handler";
 
   private final ResourcePool<String, ChannelFuture> pool;
+  private final boolean enforceSSL;
+  private final Credentials credentials;
 
   public HttpClient(
       ResourcePool<String, ChannelFuture> pool
   )
   {
+    this(pool, false, null);
+  }
+
+  private HttpClient(
+      ResourcePool<String, ChannelFuture> pool,
+      boolean enforceSSL,
+      Credentials credentials
+  )
+  {
     this.pool = pool;
+    this.enforceSSL = enforceSSL;
+    this.credentials = credentials;
   }
 
   @LifecycleStart
@@ -84,12 +100,22 @@ public class HttpClient
     pool.close();
   }
 
+  public HttpClient secureClient()
+  {
+    return new HttpClient(pool, true, credentials);
+  }
+
+  public HttpClient withCredentials(Credentials credentials)
+  {
+    return new HttpClient(pool, enforceSSL, credentials);
+  }
+
   public <Intermediate, Final> Future<Final> get(
       URL url,
       final HttpResponseHandler<Intermediate, Final> httpResponseHandler
   )
   {
-    return get(url, ImmutableMultimap.<String, Object>of(), httpResponseHandler);
+    return get(url).go(httpResponseHandler);
   }
 
   public <Intermediate, Final> Future<Final> get(
@@ -98,7 +124,13 @@ public class HttpClient
       final HttpResponseHandler<Intermediate, Final> httpResponseHandler
   )
   {
-    return go(HttpMethod.GET, url, headers, null, httpResponseHandler);
+    RequestBuilder builder = get(url);
+
+    for (Map.Entry<String, Collection<Object>> entry : headers.asMap().entrySet()) {
+      builder.setHeaderValues(entry.getKey(), entry.getValue());
+    }
+
+    return builder.go(httpResponseHandler);
   }
 
   public <Intermediate, Final> Future<Final> post(
@@ -108,18 +140,41 @@ public class HttpClient
       final HttpResponseHandler<Intermediate, Final> httpResponseHandler
   )
   {
-    return go(
-        HttpMethod.POST,
-        url,
-        ImmutableMultimap.<String, Object>builder()
-                         .put(HttpHeaders.Names.CONTENT_LENGTH, content.writerIndex())
-                         .putAll(headers)
-                         .build(),
-        content,
-        httpResponseHandler
-    );
+    RequestBuilder builder = post(url);
+
+    builder.setContent(content);
+
+    for (Map.Entry<String, Collection<Object>> entry : headers.asMap().entrySet()) {
+      builder.setHeaderValues(entry.getKey(), entry.getValue());
+    }
+
+    return builder.go(httpResponseHandler);
   }
 
+  public RequestBuilder get(URL url)
+  {
+    return makeBuilder(HttpMethod.GET, url);
+  }
+
+  public RequestBuilder post(URL url)
+  {
+    return makeBuilder(HttpMethod.POST, url);
+  }
+
+  private RequestBuilder makeBuilder(final HttpMethod method, URL url)
+  {
+    if (enforceSSL && !"https".equals(url.getProtocol())) {
+      throw new IllegalArgumentException(String.format("Requests must be over https, got[%s].", url));
+    }
+
+    final RequestBuilder builder = new RequestBuilder(this, method, url);
+
+    if (credentials != null) {
+      credentials.addCredentials(builder);
+    }
+
+    return builder;
+  }
 
   public <Intermediate, Final> Future<Final> go(
       HttpMethod method,
@@ -136,6 +191,16 @@ public class HttpClient
     final String hostKey = getPoolKey(url);
     final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
     final Channel channel = channelResourceContainer.get().awaitUninterruptibly().getChannel();
+
+    HandshakeRememberingSslHandler sslHandler = channel.getPipeline().get(HandshakeRememberingSslHandler.class);
+    if (sslHandler != null) {
+      try {
+        sslHandler.getHandshakeFutureOrHandshake().await();
+      }
+      catch (InterruptedException e) {
+        throw Throwables.propagate(e);
+      }
+    }
 
     HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.toString());
 
@@ -189,12 +254,14 @@ public class HttpClient
               } else if (msg instanceof HttpChunk) {
                 HttpChunk httpChunk = (HttpChunk) msg;
                 if (log.isDebugEnabled()) {
-                  log.debug(String.format(
-                      "[%s] Got chunk: %sB, last=%s",
-                      requestDesc,
-                      httpChunk.getContent().readableBytes(),
-                      httpChunk.isLast()
-                  ));
+                  log.debug(
+                      String.format(
+                          "[%s] Got chunk: %sB, last=%s",
+                          requestDesc,
+                          httpChunk.getContent().readableBytes(),
+                          httpChunk.isLast()
+                      )
+                  );
                 }
 
                 if (httpChunk.isLast()) {
@@ -205,7 +272,6 @@ public class HttpClient
                     retVal.set((Final) response.getObj());
                   }
                 }
-
               } else {
                 throw new IllegalStateException(String.format("Unknown message type[%s]", msg.getClass()));
               }
@@ -248,14 +314,21 @@ public class HttpClient
           public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
           {
             if (log.isDebugEnabled()) {
-              log.debug(
-                  String.format("[%s] Caught exception, bubbling out: %s", requestDesc, event.getCause().getMessage())
-              );
+              log.debug(String.format("[%s] Caught exception", requestDesc), event.getCause());
             }
 
-            channel.close();
-            channelResourceContainer.returnResource();
             retVal.setException(event.getCause());
+            channel.getPipeline().remove(LAST_HANDLER_NAME);
+            try {
+              channel.close();
+            }
+            catch (Exception e) {
+              // ignore
+            }
+            finally {
+              channelResourceContainer.returnResource();
+            }
+
             context.sendUpstream(event);
           }
 
@@ -289,57 +362,24 @@ public class HttpClient
     );
   }
 
+  /**
+   * Use HttpClientInit instead *
+   */
+  @Deprecated
   public static HttpClient create(ResourcePoolConfig config, Lifecycle lifecycle)
   {
-    return lifecycle.addManagedInstance(
-        new HttpClient(
-            new ResourcePool<String, ChannelFuture>(
-                new ChannelResourceFactory(createBootstrap(lifecycle)),
-                config
-            )
-        )
+    return HttpClientInit.createClient(
+        HttpClientConfig.builder().withNumConnections(config.getMaxPerKey()).build(),
+        lifecycle
     );
   }
 
+  /**
+   * Use HttpClientInit instead *
+   */
+  @Deprecated
   public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
   {
-    final ClientBootstrap bootstrap = new ClientBootstrap(
-        new NioClientSocketChannelFactory(
-            Executors.newCachedThreadPool(
-                new ThreadFactoryBuilder()
-                    .setDaemon(true)
-                    .setNameFormat("Netty-Boss-%s")
-                    .build()
-            ),
-            Executors.newCachedThreadPool(
-                new ThreadFactoryBuilder()
-                    .setDaemon(true)
-                    .setNameFormat("Netty-Worker-%s")
-                    .build()
-            )
-        )
-    );
-    bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
-
-    InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
-
-    lifecycle.addHandler(
-        new Lifecycle.Handler()
-        {
-          @Override
-          public void start() throws Exception
-          {
-          }
-
-          @Override
-          public void stop()
-          {
-            bootstrap.releaseExternalResources();
-          }
-        }
-    );
-
-    return bootstrap;
+    return HttpClientInit.createBootstrap(lifecycle);
   }
-
 }

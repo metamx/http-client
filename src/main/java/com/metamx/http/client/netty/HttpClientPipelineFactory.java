@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-package com.metamx.http.client;
+package com.metamx.http.client.netty;
 
 import org.apache.log4j.Logger;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.DefaultChannelPipeline;
-import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.handler.codec.http.HttpClientCodec;
 import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
-import org.jboss.netty.handler.logging.LoggingHandler;
+import org.jboss.netty.handler.ssl.SslHandler;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 
 /**
  */
@@ -37,20 +38,8 @@ public class HttpClientPipelineFactory implements ChannelPipelineFactory
   {
     ChannelPipeline pipeline = new DefaultChannelPipeline();
 
-    pipeline.addLast("early logger", new LoggingHandler());
     pipeline.addLast("codec", new HttpClientCodec());
-    pipeline.addLast("inflater",
-        new HttpContentDecompressor()
-        {
-          @Override
-          public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
-          {
-            log.warn("Exception in inflater, sending upstream: " + event.getCause(), event.getCause());
-            context.sendUpstream(event);
-          }
-        }
-    );
-    pipeline.addLast("late logger", new LoggingHandler());
+    pipeline.addLast("inflater", new HttpContentDecompressor());
 
     return pipeline;
   }

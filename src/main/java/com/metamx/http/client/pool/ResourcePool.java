@@ -143,7 +143,7 @@ public class ResourcePool<K, V> implements Closeable
       final V retVal;
       synchronized (this) {
         if (closed) {
-          log.info(String.format("get called even though I'm closed. key[%s]", key));
+          log.info(String.format("get() called even though I'm closed. key[%s]", key));
           return null;
         }
 
