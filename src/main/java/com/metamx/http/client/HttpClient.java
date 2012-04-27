@@ -16,7 +16,6 @@
 
 package com.metamx.http.client;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
@@ -31,7 +30,6 @@ import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.ClientResponse;
 import com.metamx.http.client.response.HttpResponseHandler;
-import com.metamx.http.client.response.ToStringResponseHandler;
 import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -50,11 +48,7 @@ import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpVersion;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
-import java.io.FileInputStream;
 import java.net.URL;
-import java.security.KeyStore;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -202,7 +196,7 @@ public class HttpClient
       }
     }
 
-    HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.toString());
+    HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
       request.addHeader(HttpHeaders.Names.HOST, String.format("%s:%s", url.getHost(), url.getPort()));
