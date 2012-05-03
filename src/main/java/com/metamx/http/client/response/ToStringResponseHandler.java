@@ -16,8 +16,6 @@
 
 package com.metamx.http.client.response;
 
-import com.google.common.base.Charsets;
-import org.apache.log4j.Logger;
 import org.jboss.netty.handler.codec.http.HttpChunk;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 
@@ -46,13 +44,23 @@ public class ToStringResponseHandler implements HttpResponseHandler<StringBuilde
       HttpChunk chunk
   )
   {
-    response.getObj().append(chunk.getContent().toString(charset));
+    final StringBuilder builder = response.getObj();
+    if (builder == null) {
+      return ClientResponse.finished(null);
+    }
+
+    builder.append(chunk.getContent().toString(charset));
     return response;
   }
 
   @Override
   public ClientResponse<String> done(ClientResponse<StringBuilder> response)
   {
-    return ClientResponse.finished(response.getObj().toString());
+    final StringBuilder builder = response.getObj();
+    if (builder == null) {
+      return ClientResponse.finished(null);
+    }
+
+    return ClientResponse.finished(builder.toString());
   }
 }

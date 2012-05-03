@@ -25,6 +25,8 @@ import java.util.concurrent.Future;
  */
 public class RequestBuilder
 {
+  private static final ChannelBufferFactory factory = HeapChannelBufferFactory.getInstance();
+
   private final HttpClient client;
   private final HttpMethod method;
   private final URL url;
@@ -78,8 +80,37 @@ public class RequestBuilder
     return this;
   }
 
+  public RequestBuilder setContent(byte[] bytes)
+  {
+    return setContent(null, bytes);
+  }
+
+  public RequestBuilder setContent(byte[] bytes, int offset, int length)
+  {
+    return setContent(null, bytes, offset, length);
+  }
+
   public RequestBuilder setContent(ChannelBuffer content)
   {
+    return setContent(null, content);
+  }
+
+  public RequestBuilder setContent(String contentType, byte[] bytes)
+  {
+    return setContent(contentType, bytes, 0, bytes.length);
+  }
+
+  public RequestBuilder setContent(String contentType, byte[] bytes, int offset, int length)
+  {
+    return setContent(contentType, factory.getBuffer(bytes, offset, length));
+  }
+
+  public RequestBuilder setContent(String contentType, ChannelBuffer content)
+  {
+    if (contentType != null) {
+      addHeader(HttpHeaders.Names.CONTENT_TYPE, contentType);
+    }
+
     this.content = content;
 
     setHeader(HttpHeaders.Names.CONTENT_LENGTH, content.writerIndex());
