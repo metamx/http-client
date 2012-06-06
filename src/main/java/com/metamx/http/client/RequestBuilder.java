@@ -138,6 +138,6 @@ public class RequestBuilder
       HttpResponseHandler<IntermediateType, Final> responseHandler
   )
   {
-    return client.go(method, url, headers, content, responseHandler);
+    return client.go(new Request<IntermediateType, Final>(method, url, headers, content, responseHandler));
   }
 }

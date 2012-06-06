@@ -171,13 +171,14 @@ public class HttpClient
   }
 
   public <Intermediate, Final> Future<Final> go(
-      HttpMethod method,
-      URL url,
-      Multimap<String, Object> headers,
-      ChannelBuffer content,
-      final HttpResponseHandler<Intermediate, Final> httpResponseHandler
+      Request<Intermediate, Final> request
   )
   {
+    final HttpMethod method = request.getMethod();
+    final URL url = request.getUrl();
+    final Multimap<String, Object> headers = request.getHeaders();
+    final HttpResponseHandler<Intermediate, Final> httpResponseHandler = request.getHandler();
+
     final String requestDesc = String.format("%s %s", method, url);
     if (log.isDebugEnabled()) {
       log.debug(String.format("[%s] starting", requestDesc));
@@ -196,22 +197,22 @@ public class HttpClient
       }
     }
 
-    HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
+    HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
-      request.addHeader(HttpHeaders.Names.HOST, String.format("%s:%s", url.getHost(), url.getPort()));
+      httpRequest.addHeader(HttpHeaders.Names.HOST, String.format("%s:%s", url.getHost(), url.getPort()));
     }
 
     for (Map.Entry<String, Collection<Object>> entry : headers.asMap().entrySet()) {
       String key = entry.getKey();
 
       for (Object obj : entry.getValue()) {
-        request.addHeader(key, obj);
+        httpRequest.addHeader(key, obj);
       }
     }
 
-    if (content != null) {
-      request.setContent(content);
+    if (request.hasContent()) {
+      httpRequest.setContent(request.getContent());
     }
 
     final SettableFuture<Final> retVal = SettableFuture.create();
@@ -344,7 +345,7 @@ public class HttpClient
         }
     );
 
-    channel.write(request);
+    channel.write(httpRequest);
 
     return retVal;
   }
