@@ -155,6 +155,11 @@ public class HttpClient
     return makeBuilder(HttpMethod.POST, url);
   }
 
+  public RequestBuilder put(URL url)
+  {
+    return makeBuilder(HttpMethod.PUT, url);
+  }
+
   private RequestBuilder makeBuilder(final HttpMethod method, URL url)
   {
     if (enforceSSL && !"https".equals(url.getProtocol())) {
