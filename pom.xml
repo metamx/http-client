@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.metamx</groupId>
     <artifactId>http-client</artifactId>
-    <version>0.5.1-SNAPSHOT</version>
+    <version>0.5.2-SNAPSHOT</version>
     <name>http-client</name>
     <description>An HTTP client using Netty</description>
     <scm>
@@ -16,7 +16,7 @@
         <dependency>
             <groupId>com.metamx</groupId>
             <artifactId>java-util</artifactId>
-            <version>0.4.0</version>
+            <version>0.8.1</version>
         </dependency>
 
         <dependency>
