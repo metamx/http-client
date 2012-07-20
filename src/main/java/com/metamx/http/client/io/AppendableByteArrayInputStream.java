@@ -18,6 +18,10 @@ public class AppendableByteArrayInputStream extends InputStream
   private int currIndex = 0;
 
   public void add(byte[] bytesToAdd) {
+    if (bytesToAdd.length == 0) {
+      return;
+    }
+
     synchronized (bytes) {
       bytes.addLast(bytesToAdd);
       available += bytesToAdd.length;

@@ -176,4 +176,20 @@ public class AppendableByteArrayInputStreamTest
     Assert.assertEquals(10, in.read());
     Assert.assertEquals(0, in.available());
   }
+
+  @Test
+  public void testAddEmptyByteArray() throws Exception
+  {
+    AppendableByteArrayInputStream in = new AppendableByteArrayInputStream();
+
+    in.add(new byte[]{});
+    in.add(new byte[]{1});
+    in.add(new byte[]{});
+    in.done();
+
+    Assert.assertEquals(1, in.available());
+    Assert.assertEquals(1, in.read());
+    Assert.assertEquals(0, in.available());
+    Assert.assertEquals(-1, in.read());
+  }
 }
