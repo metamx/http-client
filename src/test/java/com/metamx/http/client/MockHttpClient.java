@@ -25,13 +25,18 @@ public class MockHttpClient extends HttpClient
     this.goHandler = goHandler;
   }
 
+  public boolean succeeded()
+  {
+    return goHandler.succeeded();
+  }
+
   @Override
   public <Intermediate, Final> Future<Final> go(
       Request<Intermediate, Final> request
   )
   {
     try {
-      return goHandler.go(request);
+      return goHandler.run(request);
     }
     catch (Exception e) {
       throw Throwables.propagate(e);
