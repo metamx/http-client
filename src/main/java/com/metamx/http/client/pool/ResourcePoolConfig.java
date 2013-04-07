@@ -21,22 +21,28 @@ package com.metamx.http.client.pool;
 public class ResourcePoolConfig
 {
   private final int maxPerKey;
-  private final boolean cleanIdle;
 
+  public ResourcePoolConfig(
+      int maxPerKey
+  )
+  {
+    this.maxPerKey = maxPerKey;
+  }
+
+  @Deprecated
   public ResourcePoolConfig(
       int maxPerKey,
       boolean cleanIdle
   )
   {
+    this(maxPerKey);
+
     if (cleanIdle) {
       throw new IllegalStateException(
           "Cleaning up idle connections is a bad idea.  "
           + "If your services can't handle the max number then lower the max number."
       );
     }
-
-    this.maxPerKey = maxPerKey;
-    this.cleanIdle = cleanIdle;
   }
 
   public int getMaxPerKey()
@@ -46,6 +52,6 @@ public class ResourcePoolConfig
 
   public boolean isCleanIdle()
   {
-    return cleanIdle;
+    return false;
   }
 }
