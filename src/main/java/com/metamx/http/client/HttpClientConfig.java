@@ -1,17 +1,8 @@
 package com.metamx.http.client;
 
-import com.google.common.base.Throwables;
-import com.google.common.io.Closeables;
+import org.joda.time.Duration;
 
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 
 /**
  */
@@ -24,14 +15,26 @@ public class HttpClientConfig
 
   private final int numConnections;
   private final SSLContext sslContext;
+  private final Duration readTimeout;
 
+  @Deprecated
   public HttpClientConfig(
       int numConnections,
       SSLContext sslContext
   )
   {
+    this(numConnections, sslContext, Duration.ZERO);
+  }
+
+  public HttpClientConfig(
+      int numConnections,
+      SSLContext sslContext,
+      Duration readTimeout
+  )
+  {
     this.numConnections = numConnections;
     this.sslContext = sslContext;
+    this.readTimeout = readTimeout;
   }
 
   public int getNumConnections()
@@ -44,10 +47,16 @@ public class HttpClientConfig
     return sslContext;
   }
 
+  public Duration getReadTimeout()
+  {
+    return readTimeout;
+  }
+
   public static class Builder
   {
     private int numConnections = 1;
     private SSLContext sslContext = null;
+    private Duration readTimeout = null;
 
     private Builder(){}
 
@@ -69,9 +78,14 @@ public class HttpClientConfig
       return this;
     }
 
+    public Builder withReadTimeout(Duration readTimeout) {
+      this.readTimeout = readTimeout;
+      return this;
+    }
+
     public HttpClientConfig build()
     {
-      return new HttpClientConfig(numConnections, sslContext);
+      return new HttpClientConfig(numConnections, sslContext, readTimeout);
     }
   }
 }

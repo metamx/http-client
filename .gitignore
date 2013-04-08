@@ -4,3 +4,4 @@ target
 *.ipr
 *.iws
 *.tar.gz
+.idea
