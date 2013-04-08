@@ -13,6 +13,7 @@ import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.logging.InternalLoggerFactory;
 import org.jboss.netty.logging.Log4JLoggerFactory;
+import org.joda.time.Duration;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -32,22 +33,22 @@ public class HttpClientInit
 {
   public static HttpClient createClient(HttpClientConfig config, Lifecycle lifecycle)
   {
-    return createClient(
-        new ResourcePoolConfig(config.getNumConnections(), false),
-        config.getSslContext(),
-        lifecycle
-    );
-  }
-
-  public static HttpClient createClient(ResourcePoolConfig config, final SSLContext sslContext, Lifecycle lifecycle)
-  {
     return lifecycle.addManagedInstance(
         new HttpClient(
             new ResourcePool<String, ChannelFuture>(
-                new ChannelResourceFactory(createBootstrap(lifecycle), sslContext),
-                config
+                new ChannelResourceFactory(createBootstrap(lifecycle), config.getSslContext()),
+                new ResourcePoolConfig(config.getNumConnections())
             )
-        )
+        ).withReadTimeout(config.getReadTimeout())
+    );
+  }
+
+  @Deprecated
+  public static HttpClient createClient(ResourcePoolConfig config, final SSLContext sslContext, Lifecycle lifecycle)
+  {
+    return createClient(
+        new HttpClientConfig(config.getMaxPerKey(), sslContext, Duration.ZERO),
+        lifecycle
     );
   }
 
@@ -69,6 +70,8 @@ public class HttpClientInit
             )
         )
     );
+
+    bootstrap.setOption("keepAlive", true);
     bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
 
     InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());

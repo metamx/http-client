@@ -20,6 +20,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
@@ -47,11 +48,16 @@ import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpVersion;
+import org.jboss.netty.handler.timeout.ReadTimeoutHandler;
+import org.jboss.netty.util.HashedWheelTimer;
+import org.jboss.netty.util.Timer;
+import org.joda.time.Duration;
 
 import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  */
@@ -59,28 +65,39 @@ public class HttpClient
 {
   private static final Logger log = Logger.getLogger(HttpClient.class);
 
+  private static final String READ_TIMEOUT_HANDLER_NAME = "read-timeout";
   private static final String LAST_HANDLER_NAME = "last-handler";
 
+  private final Timer timer;
   private final ResourcePool<String, ChannelFuture> pool;
   private final boolean enforceSSL;
   private final Credentials credentials;
+  private final Duration readTimeout;
 
   public HttpClient(
       ResourcePool<String, ChannelFuture> pool
   )
   {
-    this(pool, false, null);
+    this(pool, false, null, null);
   }
 
   private HttpClient(
       ResourcePool<String, ChannelFuture> pool,
       boolean enforceSSL,
-      Credentials credentials
+      Credentials credentials,
+      Duration readTimeout
   )
   {
     this.pool = pool;
     this.enforceSSL = enforceSSL;
     this.credentials = credentials;
+    this.readTimeout = readTimeout;
+
+    if (readTimeout != null && readTimeout.getMillis() > 0) {
+      this.timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build());
+    } else {
+      this.timer = null;
+    }
   }
 
   @LifecycleStart
@@ -91,17 +108,26 @@ public class HttpClient
   @LifecycleStop
   public void stop()
   {
+    if (hasTimeout()) {
+      timer.stop();
+    }
+
     pool.close();
   }
 
   public HttpClient secureClient()
   {
-    return new HttpClient(pool, true, credentials);
+    return new HttpClient(pool, true, credentials, readTimeout);
   }
 
   public HttpClient withCredentials(Credentials credentials)
   {
-    return new HttpClient(pool, enforceSSL, credentials);
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout);
+  }
+
+  public HttpClient withReadTimeout(Duration readTimeout)
+  {
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout);
   }
 
   public <Intermediate, Final> Future<Final> get(
@@ -222,6 +248,13 @@ public class HttpClient
 
     final SettableFuture<Final> retVal = SettableFuture.create();
 
+    if (hasTimeout()) {
+      channel.getPipeline().addLast(
+          READ_TIMEOUT_HANDLER_NAME,
+          new ReadTimeoutHandler(timer, readTimeout.getMillis(), TimeUnit.MILLISECONDS)
+      );
+    }
+
     channel.getPipeline().addLast(
         LAST_HANDLER_NAME,
         new SimpleChannelUpstreamHandler()
@@ -306,7 +339,7 @@ public class HttpClient
             if (!retVal.isDone()) {
               retVal.set(finalResponse.getObj());
             }
-            channel.getPipeline().remove(LAST_HANDLER_NAME);
+            removeHandlers();
             channelResourceContainer.returnResource();
           }
 
@@ -318,7 +351,7 @@ public class HttpClient
             }
 
             retVal.setException(event.getCause());
-            channel.getPipeline().remove(LAST_HANDLER_NAME);
+            removeHandlers();
             try {
               channel.close();
             }
@@ -347,12 +380,25 @@ public class HttpClient
             }
             context.sendUpstream(event);
           }
+
+          private void removeHandlers()
+          {
+            if (hasTimeout()) {
+              channel.getPipeline().remove(READ_TIMEOUT_HANDLER_NAME);
+            }
+            channel.getPipeline().remove(LAST_HANDLER_NAME);
+          }
         }
     );
 
     channel.write(httpRequest);
 
     return retVal;
+  }
+
+  private boolean hasTimeout()
+  {
+    return timer != null;
   }
 
   private String getPoolKey(URL url)
