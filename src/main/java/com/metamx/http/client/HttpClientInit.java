@@ -70,6 +70,8 @@ public class HttpClientInit
             )
         )
     );
+
+    bootstrap.setOption("keepAlive", true);
     bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
 
     InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
