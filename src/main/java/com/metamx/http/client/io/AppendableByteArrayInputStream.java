@@ -1,13 +1,18 @@
 package com.metamx.http.client.io;
 
+import com.metamx.common.logger.Logger;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedList;
+import java.util.NoSuchElementException;
 
 /**
  */
 public class AppendableByteArrayInputStream extends InputStream
 {
+  private static final Logger log = new Logger(AppendableByteArrayInputStream.class);
+
   private final LinkedList<byte[]> bytes = new LinkedList<byte[]>();
   private final SingleByteReaderDoer singleByteReaderDoer = new SingleByteReaderDoer();
 
@@ -22,18 +27,18 @@ public class AppendableByteArrayInputStream extends InputStream
       return;
     }
 
-    synchronized (bytes) {
+    synchronized (singleByteReaderDoer) {
       bytes.addLast(bytesToAdd);
       available += bytesToAdd.length;
-      bytes.notify();
+      singleByteReaderDoer.notify();
     }
   }
 
   public void done()
   {
-    synchronized (bytes) {
+    synchronized (singleByteReaderDoer) {
       done = true;
-      bytes.notify();
+      singleByteReaderDoer.notify();
     }
   }
 
@@ -96,7 +101,7 @@ public class AppendableByteArrayInputStream extends InputStream
 
     while (numToScan > numScanned) {
       if (currIndex >= curr.length) {
-        synchronized (bytes) {
+        synchronized (singleByteReaderDoer) {
           if (bytes.isEmpty()) {
             if (done) {
               break;
@@ -104,7 +109,7 @@ public class AppendableByteArrayInputStream extends InputStream
             try {
               available -= numPulled;
               numPulled = 0;
-              bytes.wait();
+              singleByteReaderDoer.wait();
             }
             catch (InterruptedException e) {
               Thread.currentThread().interrupt();
@@ -112,8 +117,14 @@ public class AppendableByteArrayInputStream extends InputStream
             }
           }
 
-          if (bytes.isEmpty() && done) {
-            break;
+          if (bytes.isEmpty()) {
+            if (done) {
+              break;
+            }
+            else {
+              log.debug("bytes was empty, but read thread was awakened without being done.  This shouldn't happen.");
+              continue;
+            }
           }
 
           curr = bytes.removeFirst();
@@ -128,7 +139,7 @@ public class AppendableByteArrayInputStream extends InputStream
       numPulled += numToPullFromCurr;
     }
 
-    synchronized (bytes) {
+    synchronized (singleByteReaderDoer) {
       available -= numPulled;
     }
 

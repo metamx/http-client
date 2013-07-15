@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.metamx.common.IAE;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
@@ -231,7 +232,7 @@ public class HttpClient
     HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
-      httpRequest.addHeader(HttpHeaders.Names.HOST, String.format("%s:%s", url.getHost(), url.getPort()));
+      httpRequest.addHeader(HttpHeaders.Names.HOST, getHost(url));
     }
 
     for (Map.Entry<String, Collection<Object>> entry : headers.asMap().entrySet()) {
@@ -399,6 +400,26 @@ public class HttpClient
   private boolean hasTimeout()
   {
     return timer != null;
+  }
+
+  private String getHost(URL url) {
+    int port = url.getPort();
+
+    if (port == -1) {
+      final String protocol = url.getProtocol();
+
+      if ("http".equalsIgnoreCase(protocol)) {
+        port = 80;
+      }
+      else if ("https".equalsIgnoreCase(protocol)) {
+        port = 443;
+      }
+      else {
+        throw new IAE("Cannot figure out default port for protocol[%s], please set Host header.", protocol);
+      }
+    }
+
+    return String.format("%s:%s", url.getHost(), port);
   }
 
   private String getPoolKey(URL url)
