@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelStateEvent;
@@ -377,7 +378,7 @@ public class HttpClient
             channelResourceContainer.returnResource();
             if (!retVal.isDone()) {
               log.warn(String.format("[%s] Channel disconnected before response complete", requestDesc));
-              retVal.setException(new RuntimeException("Channel disconnected"));
+              retVal.setException(new ChannelException("Channel disconnected"));
             }
             context.sendUpstream(event);
           }
