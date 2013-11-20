@@ -33,14 +33,19 @@ public class HttpClientInit
 {
   public static HttpClient createClient(HttpClientConfig config, Lifecycle lifecycle)
   {
-    return lifecycle.addManagedInstance(
-        new HttpClient(
-            new ResourcePool<String, ChannelFuture>(
-                new ChannelResourceFactory(createBootstrap(lifecycle), config.getSslContext()),
-                new ResourcePoolConfig(config.getNumConnections())
-            )
-        ).withReadTimeout(config.getReadTimeout())
-    );
+    try {
+      return lifecycle.addMaybeStartManagedInstance(
+          new HttpClient(
+              new ResourcePool<String, ChannelFuture>(
+                  new ChannelResourceFactory(createBootstrap(lifecycle), config.getSslContext()),
+                  new ResourcePoolConfig(config.getNumConnections())
+              )
+          ).withReadTimeout(config.getReadTimeout())
+      );
+    }
+    catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
   }
 
   @Deprecated
