@@ -76,21 +76,26 @@ public class HttpClientInit
 
     InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
 
-    lifecycle.addHandler(
-        new Lifecycle.Handler()
-        {
-          @Override
-          public void start() throws Exception
+    try {
+      lifecycle.addMaybeStartHandler(
+          new Lifecycle.Handler()
           {
-          }
+            @Override
+            public void start() throws Exception
+            {
+            }
 
-          @Override
-          public void stop()
-          {
-            bootstrap.releaseExternalResources();
+            @Override
+            public void stop()
+            {
+              bootstrap.releaseExternalResources();
+            }
           }
-        }
-    );
+      );
+    }
+    catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
 
     return bootstrap;
   }
