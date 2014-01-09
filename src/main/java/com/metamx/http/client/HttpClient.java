@@ -19,6 +19,7 @@ package com.metamx.http.client;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.metamx.common.IAE;
@@ -58,7 +59,6 @@ import org.joda.time.Duration;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -132,7 +132,7 @@ public class HttpClient
     return new HttpClient(pool, enforceSSL, credentials, readTimeout);
   }
 
-  public <Intermediate, Final> Future<Final> get(
+  public <Intermediate, Final> ListenableFuture<Final> get(
       URL url,
       final HttpResponseHandler<Intermediate, Final> httpResponseHandler
   )
@@ -140,7 +140,7 @@ public class HttpClient
     return get(url).go(httpResponseHandler);
   }
 
-  public <Intermediate, Final> Future<Final> get(
+  public <Intermediate, Final> ListenableFuture<Final> get(
       URL url,
       ImmutableMultimap<String, Object> headers,
       final HttpResponseHandler<Intermediate, Final> httpResponseHandler
@@ -155,7 +155,7 @@ public class HttpClient
     return builder.go(httpResponseHandler);
   }
 
-  public <Intermediate, Final> Future<Final> post(
+  public <Intermediate, Final> ListenableFuture<Final> post(
       URL url,
       ChannelBuffer content,
       ImmutableMultimap<String, Object> headers,
@@ -203,7 +203,7 @@ public class HttpClient
     return builder;
   }
 
-  public <Intermediate, Final> Future<Final> go(
+  public <Intermediate, Final> ListenableFuture<Final> go(
       Request<Intermediate, Final> request
   )
   {
