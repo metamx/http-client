@@ -1,6 +1,7 @@
 package com.metamx.http.client;
 
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.concurrent.Future;
 
@@ -31,7 +32,7 @@ public class MockHttpClient extends HttpClient
   }
 
   @Override
-  public <Intermediate, Final> Future<Final> go(
+  public <Intermediate, Final> ListenableFuture<Final> go(
       Request<Intermediate, Final> request
   )
   {

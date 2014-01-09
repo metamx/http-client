@@ -6,6 +6,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.http.client.response.HttpResponseHandler;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferFactory;
@@ -19,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.Future;
 
 /**
  */
@@ -134,7 +134,7 @@ public class RequestBuilder
         .toString(Charsets.UTF_8);
   }
 
-  public <IntermediateType, Final> Future<Final> go(
+  public <IntermediateType, Final> ListenableFuture<Final> go(
       HttpResponseHandler<IntermediateType, Final> responseHandler
   )
   {
