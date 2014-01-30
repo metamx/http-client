@@ -130,7 +130,7 @@ public class RequestBuilder
     final ChannelBufferFactory bufferFactory = HeapChannelBufferFactory.getInstance();
 
     return Base64
-        .encode(bufferFactory.getBuffer(ByteBuffer.wrap(value.getBytes(Charsets.UTF_8))))
+        .encode(bufferFactory.getBuffer(ByteBuffer.wrap(value.getBytes(Charsets.UTF_8))), false)
         .toString(Charsets.UTF_8);
   }
 
