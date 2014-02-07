@@ -21,6 +21,7 @@ import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableSet;
 import org.apache.log4j.Logger;
 
 import java.io.Closeable;
@@ -116,9 +117,9 @@ public class ResourcePool<K, V> implements Closeable
   public void close()
   {
     closed.set(true);
-    for (Map.Entry<K, ImmediateCreationResourceHolder<K, V>> kv : pool.asMap().entrySet()) {
-      kv.getValue().close();
-      pool.invalidate(kv.getKey());
+    final Map<K, ImmediateCreationResourceHolder<K, V>> mapView = pool.asMap();
+    for (K k : ImmutableSet.copyOf(mapView.keySet())) {
+      mapView.remove(k).close();
     }
   }
 
