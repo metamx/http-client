@@ -16,14 +16,17 @@
 
 package com.metamx.http.client.pool;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.MapMaker;
+import com.google.common.base.Throwables;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import org.apache.log4j.Logger;
 
 import java.io.Closeable;
 import java.util.LinkedList;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -31,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ResourcePool<K, V> implements Closeable
 {
   private static final Logger log = Logger.getLogger(ResourcePool.class);
-  private final ConcurrentMap<K, ImmediateCreationResourceHolder<K, V>> pool;
+  private final LoadingCache<K, ImmediateCreationResourceHolder<K, V>> pool;
   private final AtomicBoolean closed = new AtomicBoolean(false);
 
   public ResourcePool(
@@ -39,11 +42,11 @@ public class ResourcePool<K, V> implements Closeable
       final ResourcePoolConfig config
   )
   {
-    this.pool = new MapMaker().makeComputingMap(
-        new Function<K, ImmediateCreationResourceHolder<K, V>>()
+    this.pool = CacheBuilder.newBuilder().build(
+        new CacheLoader<K, ImmediateCreationResourceHolder<K, V>>()
         {
           @Override
-          public ImmediateCreationResourceHolder<K, V> apply(K input)
+          public ImmediateCreationResourceHolder<K, V> load(K input) throws Exception
           {
             return new ImmediateCreationResourceHolder<K, V>(
                 config.getMaxPerKey(),
@@ -62,7 +65,13 @@ public class ResourcePool<K, V> implements Closeable
       return null;
     }
 
-    final ImmediateCreationResourceHolder<K, V> holder = pool.get(key);
+    final ImmediateCreationResourceHolder<K, V> holder;
+    try {
+      holder = pool.get(key);
+    }
+    catch (ExecutionException e) {
+      throw Throwables.propagate(e);
+    }
     final V value = holder.get();
 
     return new ResourceContainer<V>()
@@ -107,8 +116,9 @@ public class ResourcePool<K, V> implements Closeable
   public void close()
   {
     closed.set(true);
-    for (K k : pool.keySet()) {
-      pool.remove(k).close();
+    for (Map.Entry<K, ImmediateCreationResourceHolder<K, V>> kv : pool.asMap().entrySet()) {
+      kv.getValue().close();
+      pool.invalidate(kv.getKey());
     }
   }
 
