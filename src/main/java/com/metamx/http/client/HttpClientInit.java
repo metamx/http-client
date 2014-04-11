@@ -141,7 +141,12 @@ public class HttpClientInit
       throw Throwables.propagate(e);
     }
     finally {
-      Closeables.closeQuietly(in);
+      try {
+        Closeables.close(in, true);
+      }
+      catch (IOException e) {
+        //
+      }
     }
   }
 }
