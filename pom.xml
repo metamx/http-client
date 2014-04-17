@@ -3,14 +3,14 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.metamx</groupId>
     <artifactId>http-client</artifactId>
-    <version>0.9.2-SNAPSHOT</version>
+    <version>0.9.2</version>
     <name>http-client</name>
     <description>An HTTP client using Netty</description>
     <scm>
         <connection>scm:git:ssh://git@github.com/metamx/http-client.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/metamx/http-client.git</developerConnection>
         <url>http://www.github.com/metamx/http-client</url>
-      <tag>HEAD</tag>
+      <tag>http-client-0.9.2</tag>
   </scm>
 
     <dependencies>
