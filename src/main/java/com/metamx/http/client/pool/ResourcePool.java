@@ -128,9 +128,7 @@ public class ResourcePool<K, V> implements Closeable
     private final int maxSize;
     private final K key;
     private final ResourceFactory<K, V> factory;
-
     private final LinkedList<V> objectList;
-
     private boolean closed = false;
 
     private ImmediateCreationResourceHolder(
@@ -153,12 +151,7 @@ public class ResourcePool<K, V> implements Closeable
     {
       final V retVal;
       synchronized (this) {
-        if (closed) {
-          log.info(String.format("get() called even though I'm closed. key[%s]", key));
-          return null;
-        }
-
-        while (objectList.size() == 0) {
+        while (!closed && objectList.size() == 0) {
           try {
             this.wait();
           }
@@ -167,6 +160,12 @@ public class ResourcePool<K, V> implements Closeable
             return null;
           }
         }
+
+        if (closed) {
+          log.info(String.format("get() called even though I'm closed. key[%s]", key));
+          return null;
+        }
+
 
         retVal = objectList.removeFirst();
       }
@@ -225,6 +224,7 @@ public class ResourcePool<K, V> implements Closeable
         while (!objectList.isEmpty()) {
           factory.close(objectList.removeFirst());
         }
+        this.notifyAll();
       }
     }
   }

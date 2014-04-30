@@ -122,6 +122,53 @@ public class ResourcePoolTest
     Assert.assertEquals("billy0", blockedThread.getValue());
   }
 
+  @Test
+  public void testCloseUnblocks() throws InterruptedException {
+    primePool();
+    EasyMock.expect(resourceFactory.isGood("billy1")).andReturn(true).times(1);
+    EasyMock.expect(resourceFactory.isGood("billy0")).andReturn(true).times(1);
+    resourceFactory.close("sally1");
+    EasyMock.expectLastCall().times(1);
+    resourceFactory.close("sally0");
+    EasyMock.expectLastCall().times(1);
+    EasyMock.replay(resourceFactory);
+    CountDownLatch latch1 = new CountDownLatch(1);
+    CountDownLatch latch2 = new CountDownLatch(1);
+    CountDownLatch latch3 = new CountDownLatch(1);
+
+    MyThread billy1Thread = new MyThread(latch1, "billy");
+    billy1Thread.start();
+    billy1Thread.waitForValueToBeGotten(1, TimeUnit.SECONDS);
+    MyThread billy0Thread = new MyThread(latch2, "billy");
+    billy0Thread.start();
+    billy0Thread.waitForValueToBeGotten(1, TimeUnit.SECONDS);
+
+    MyThread blockedThread = new MyThread(latch3, "billy");
+    blockedThread.start();
+    blockedThread.waitForValueToBeGotten(1, TimeUnit.SECONDS);
+    pool.close();
+
+
+    EasyMock.verify(resourceFactory);
+    EasyMock.reset(resourceFactory);
+    EasyMock.replay(resourceFactory);
+
+    latch2.countDown();
+    blockedThread.waitForValueToBeGotten(1, TimeUnit.SECONDS);
+
+    EasyMock.verify(resourceFactory);
+    EasyMock.reset(resourceFactory);
+
+    latch1.countDown();
+    latch3.countDown();
+
+    Assert.assertEquals("billy1", billy1Thread.getValue());
+    Assert.assertEquals("billy0", billy0Thread.getValue());
+    blockedThread.join();
+    // pool returns null after close
+    Assert.assertEquals(null, blockedThread.getValue());
+  }
+
   private static class StringIncrementingAnswer implements IAnswer<String>
   {
     int count = 0;
@@ -141,7 +188,7 @@ public class ResourcePoolTest
   private class MyThread extends Thread
   {
     private final CountDownLatch gotValueLatch = new CountDownLatch(1);
-    
+
     private final CountDownLatch latch1;
     private String resourceName;
 
