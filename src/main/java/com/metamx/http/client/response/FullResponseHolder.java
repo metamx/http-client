@@ -16,27 +16,36 @@
 
 package com.metamx.http.client.response;
 
+import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
 /**
  */
-public class StatusResponseHolder
+public class FullResponseHolder
 {
   private final HttpResponseStatus status;
+  private final HttpResponse response;
   private final StringBuilder builder;
 
-  public StatusResponseHolder(
+  public FullResponseHolder(
       HttpResponseStatus status,
+      HttpResponse response,
       StringBuilder builder
   )
   {
     this.status = status;
+    this.response = response;
     this.builder = builder;
   }
 
   public HttpResponseStatus getStatus()
   {
     return status;
+  }
+
+  public HttpResponse getResponse()
+  {
+    return response;
   }
 
   public StringBuilder getBuilder()

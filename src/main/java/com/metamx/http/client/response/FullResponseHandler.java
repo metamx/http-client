@@ -23,29 +23,30 @@ import java.nio.charset.Charset;
 
 /**
  */
-public class StatusResponseHandler implements HttpResponseHandler<StatusResponseHolder, StatusResponseHolder>
+public class FullResponseHandler implements HttpResponseHandler<FullResponseHolder, FullResponseHolder>
 {
   private final Charset charset;
 
-  public StatusResponseHandler(Charset charset)
+  public FullResponseHandler(Charset charset)
   {
     this.charset = charset;
   }
 
   @Override
-  public ClientResponse<StatusResponseHolder> handleResponse(HttpResponse response)
+  public ClientResponse<FullResponseHolder> handleResponse(HttpResponse response)
   {
     return ClientResponse.unfinished(
-        new StatusResponseHolder(
+        new FullResponseHolder(
             response.getStatus(),
+            response,
             new StringBuilder(response.getContent().toString(charset))
         )
     );
   }
 
   @Override
-  public ClientResponse<StatusResponseHolder> handleChunk(
-      ClientResponse<StatusResponseHolder> response,
+  public ClientResponse<FullResponseHolder> handleChunk(
+      ClientResponse<FullResponseHolder> response,
       HttpChunk chunk
   )
   {
@@ -60,7 +61,7 @@ public class StatusResponseHandler implements HttpResponseHandler<StatusResponse
   }
 
   @Override
-  public ClientResponse<StatusResponseHolder> done(ClientResponse<StatusResponseHolder> response)
+  public ClientResponse<FullResponseHolder> done(ClientResponse<FullResponseHolder> response)
   {
     return ClientResponse.finished(response.getObj());
   }
