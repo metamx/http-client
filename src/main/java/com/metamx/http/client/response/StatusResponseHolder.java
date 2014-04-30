@@ -18,22 +18,36 @@ package com.metamx.http.client.response;
 
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  */
 public class StatusResponseHolder
 {
   private final HttpResponseStatus status;
+  private final List<Map.Entry<String, String>> headers;
   private final StringBuilder builder;
 
-  public StatusResponseHolder(HttpResponseStatus status, StringBuilder builder)
+  public StatusResponseHolder(
+      HttpResponseStatus status,
+      List<Map.Entry<String, String>> headers,
+      StringBuilder builder
+  )
   {
     this.status = status;
+    this.headers = headers;
     this.builder = builder;
   }
 
   public HttpResponseStatus getStatus()
   {
     return status;
+  }
+
+  public List<Map.Entry<String, String>> getHeaders()
+  {
+    return headers;
   }
 
   public StringBuilder getBuilder()
