@@ -236,6 +236,8 @@ public class HttpClient
       httpRequest.headers().add(HttpHeaders.Names.HOST, getHost(url));
     }
 
+    httpRequest.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
+
     for (Map.Entry<String, Collection<Object>> entry : headers.asMap().entrySet()) {
       String key = entry.getKey();
 
