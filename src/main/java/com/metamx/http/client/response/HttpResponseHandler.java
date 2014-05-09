@@ -47,4 +47,5 @@ public interface HttpResponseHandler<IntermediateType, FinalType>
   public ClientResponse<IntermediateType> handleResponse(HttpResponse response);
   public ClientResponse<IntermediateType> handleChunk(ClientResponse<IntermediateType> clientResponse, HttpChunk chunk);
   public ClientResponse<FinalType> done(ClientResponse<IntermediateType> clientResponse);
+  public void exceptionCaught(ClientResponse<IntermediateType> clientResponse,Throwable e);
 }

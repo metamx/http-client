@@ -63,4 +63,13 @@ public class ToStringResponseHandler implements HttpResponseHandler<StringBuilde
 
     return ClientResponse.finished(builder.toString());
   }
+
+  @Override
+  public void exceptionCaught(
+      ClientResponse<StringBuilder> clientResponse, Throwable e
+  )
+  {
+    // Its safe to Ignore as the ClientResponse returned in handleChunk were unfinished
+  }
+
 }

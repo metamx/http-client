@@ -10,7 +10,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  */
@@ -191,5 +191,50 @@ public class AppendableByteArrayInputStreamTest
     Assert.assertEquals(1, in.read());
     Assert.assertEquals(0, in.available());
     Assert.assertEquals(-1, in.read());
+  }
+
+  @Test
+  public void testExceptionUnblocks() throws InterruptedException
+  {
+    final AppendableByteArrayInputStream in = new AppendableByteArrayInputStream();
+    in.add(new byte[]{});
+    in.add(new byte[]{1});
+    in.add(new byte[]{});
+    final AtomicReference<IOException> exceptionThrown = new AtomicReference<IOException>();
+    final CountDownLatch latch = new CountDownLatch(1);
+    Executors.newSingleThreadExecutor().submit(
+        new Callable()
+        {
+          @Override
+          public byte[] call() throws Exception
+          {
+            try {
+              byte[] readBytes = new byte[10];
+              in.read(readBytes);
+              return readBytes;
+            }
+            catch (IOException e) {
+              exceptionThrown.set(e);
+              latch.countDown();
+            }
+            return null;
+          }
+        }
+    );
+
+    Exception expected = new Exception();
+    in.exceptionCaught(expected);
+
+    latch.await();
+    Assert.assertEquals(expected, exceptionThrown.get().getCause());
+
+    try {
+      in.read();
+      Assert.fail();
+    }
+    catch (IOException thrown) {
+      Assert.assertEquals(expected, thrown.getCause());
+    }
+
   }
 }

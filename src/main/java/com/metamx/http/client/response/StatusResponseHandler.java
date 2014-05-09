@@ -64,4 +64,13 @@ public class StatusResponseHandler implements HttpResponseHandler<StatusResponse
   {
     return ClientResponse.finished(response.getObj());
   }
+
+  @Override
+  public void exceptionCaught(
+      ClientResponse<StatusResponseHolder> clientResponse, Throwable e
+  )
+  {
+    // Its safe to Ignore as the ClientResponse returned in handleChunk were unfinished
+  }
+
 }

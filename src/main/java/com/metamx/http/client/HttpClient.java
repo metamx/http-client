@@ -353,6 +353,10 @@ public class HttpClient
             }
 
             retVal.setException(event.getCause());
+            // response is non-null If we received initial chunk and then exception occurs
+            if (response != null) {
+              httpResponseHandler.exceptionCaught(response, event.getCause());
+            }
             removeHandlers();
             try {
               channel.close();

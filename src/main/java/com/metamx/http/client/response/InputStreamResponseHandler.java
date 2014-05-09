@@ -37,6 +37,16 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
     return ClientResponse.<InputStream>finished(obj);
   }
 
+  @Override
+  public void exceptionCaught(
+      ClientResponse<AppendableByteArrayInputStream> clientResponse,
+      Throwable e
+  )
+  {
+    final AppendableByteArrayInputStream obj = clientResponse.getObj();
+    obj.exceptionCaught(e);
+  }
+
   private byte[] getContentBytes(ChannelBuffer content)
   {
     byte[] contentBytes = new byte[content.readableBytes()];
