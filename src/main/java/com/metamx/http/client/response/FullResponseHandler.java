@@ -65,4 +65,13 @@ public class FullResponseHandler implements HttpResponseHandler<FullResponseHold
   {
     return ClientResponse.finished(response.getObj());
   }
+
+  @Override
+  public void exceptionCaught(
+      ClientResponse<FullResponseHolder> clientResponse, Throwable e
+  )
+  {
+    // Its safe to Ignore as the ClientResponse returned in handleChunk were unfinished
+  }
+
 }

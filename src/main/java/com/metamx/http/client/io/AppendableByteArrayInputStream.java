@@ -17,6 +17,7 @@ public class AppendableByteArrayInputStream extends InputStream
   private final SingleByteReaderDoer singleByteReaderDoer = new SingleByteReaderDoer();
 
   private volatile boolean done = false;
+  private volatile Throwable throwable;
   private volatile int available = 0;
 
   private byte[] curr = new byte[]{};
@@ -38,6 +39,15 @@ public class AppendableByteArrayInputStream extends InputStream
   {
     synchronized (singleByteReaderDoer) {
       done = true;
+      singleByteReaderDoer.notify();
+    }
+  }
+
+  public void exceptionCaught(Throwable t)
+  {
+    synchronized (singleByteReaderDoer) {
+      done = true;
+      throwable = t;
       singleByteReaderDoer.notify();
     }
   }
@@ -115,6 +125,10 @@ public class AppendableByteArrayInputStream extends InputStream
               Thread.currentThread().interrupt();
               throw new IOException("Interrupted!");
             }
+          }
+
+          if (throwable != null) {
+            throw new IOException(throwable);
           }
 
           if (bytes.isEmpty()) {

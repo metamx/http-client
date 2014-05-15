@@ -353,6 +353,10 @@ public class HttpClient
             }
 
             retVal.setException(event.getCause());
+            // response is non-null if we received initial chunk and then exception occurs
+            if (response != null) {
+              httpResponseHandler.exceptionCaught(response, event.getCause());
+            }
             removeHandlers();
             try {
               channel.close();
@@ -373,7 +377,10 @@ public class HttpClient
             if (log.isDebugEnabled()) {
               log.debug(String.format("[%s] Channel disconnected", requestDesc));
             }
-
+            // response is non-null if we received initial chunk and then exception occurs
+            if (response != null) {
+              httpResponseHandler.exceptionCaught(response, new ChannelException("Channel disconnected"));
+            }
             channel.close();
             channelResourceContainer.returnResource();
             if (!retVal.isDone()) {
