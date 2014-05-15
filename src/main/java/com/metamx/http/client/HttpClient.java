@@ -233,14 +233,16 @@ public class HttpClient
     HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
-      httpRequest.addHeader(HttpHeaders.Names.HOST, getHost(url));
+      httpRequest.headers().add(HttpHeaders.Names.HOST, getHost(url));
     }
+
+    httpRequest.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
 
     for (Map.Entry<String, Collection<Object>> entry : headers.asMap().entrySet()) {
       String key = entry.getKey();
 
       for (Object obj : entry.getValue()) {
-        httpRequest.addHeader(key, obj);
+        httpRequest.headers().add(key, obj);
       }
     }
 
