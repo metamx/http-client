@@ -188,6 +188,11 @@ public class HttpClient
     return makeBuilder(HttpMethod.PUT, url);
   }
 
+  public RequestBuilder delete(URL url)
+  {
+    return makeBuilder(HttpMethod.DELETE, url);
+  }
+
   private RequestBuilder makeBuilder(final HttpMethod method, URL url)
   {
     if (enforceSSL && !"https".equals(url.getProtocol())) {
