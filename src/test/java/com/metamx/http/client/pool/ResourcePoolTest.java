@@ -1,5 +1,6 @@
 package com.metamx.http.client.pool;
 
+import com.metamx.common.ISE;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.junit.After;
@@ -30,12 +31,6 @@ public class ResourcePoolTest
 
     EasyMock.verify(resourceFactory);
     EasyMock.reset(resourceFactory);
-  }
-
-  @After
-  public void tearDown() throws Exception
-  {
-    EasyMock.verify();
   }
 
   @Test
@@ -79,6 +74,51 @@ public class ResourcePoolTest
     ResourceContainer<String> billy = pool.take("billy");
     Assert.assertEquals("billy2", billy.get());
     billy.returnResource();
+
+    EasyMock.verify(resourceFactory);
+    EasyMock.reset(resourceFactory);
+  }
+
+  @Test
+  public void testFaultyFailedResourceReplacement() throws Exception
+  {
+    primePool();
+
+    EasyMock.expect(resourceFactory.isGood("billy1")).andReturn(false).times(1);
+    resourceFactory.close("billy1");
+    EasyMock.expectLastCall();
+    EasyMock.expect(resourceFactory.generate("billy")).andThrow(new ISE("where's billy?")).times(1);
+    EasyMock.expect(resourceFactory.isGood("billy0")).andReturn(false).times(1);
+    resourceFactory.close("billy0");
+    EasyMock.expectLastCall();
+    EasyMock.expect(resourceFactory.generate("billy")).andThrow(new ISE("where's billy?")).times(1);
+    EasyMock.expect(resourceFactory.generate("billy")).andReturn("billy2").times(1);
+    EasyMock.replay(resourceFactory);
+
+    IllegalStateException e1 = null;
+    try {
+      pool.take("billy");
+    } catch (IllegalStateException e) {
+      e1 = e;
+    }
+    Assert.assertNotNull("exception", e1);
+    Assert.assertEquals("where's billy?", e1.getMessage());
+
+    IllegalStateException e2 = null;
+    try {
+      pool.take("billy");
+    } catch (IllegalStateException e) {
+      e2 = e;
+    }
+    Assert.assertNotNull("exception", e2);
+    Assert.assertEquals("where's billy?", e2.getMessage());
+
+    ResourceContainer<String> billy = pool.take("billy");
+    Assert.assertEquals("billy2", billy.get());
+    billy.returnResource();
+
+    EasyMock.verify(resourceFactory);
+    EasyMock.reset(resourceFactory);
   }
 
   @Test

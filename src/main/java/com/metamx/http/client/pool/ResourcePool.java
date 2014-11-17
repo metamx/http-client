@@ -129,6 +129,7 @@ public class ResourcePool<K, V> implements Closeable
     private final K key;
     private final ResourceFactory<K, V> factory;
     private final LinkedList<V> objectList;
+    private int deficit = 0;
     private boolean closed = false;
 
     private ImmediateCreationResourceHolder(
@@ -143,15 +144,16 @@ public class ResourcePool<K, V> implements Closeable
 
       this.objectList = new LinkedList<V>();
       for (int i = 0; i < maxSize; ++i) {
-        objectList.addLast(factory.generate(key));
+        objectList.addLast(Preconditions.checkNotNull(factory.generate(key), "factory.generate(key)"));
       }
     }
 
     V get()
     {
+      // objectList can't have nulls, so we'll use a null to signal that we need to create a new resource.
       final V retVal;
       synchronized (this) {
-        while (!closed && objectList.size() == 0) {
+        while (!closed && objectList.size() == 0 && deficit == 0) {
           try {
             this.wait();
           }
@@ -164,23 +166,39 @@ public class ResourcePool<K, V> implements Closeable
         if (closed) {
           log.info(String.format("get() called even though I'm closed. key[%s]", key));
           return null;
+        } else if (!objectList.isEmpty()) {
+          retVal = objectList.removeFirst();
+        } else if (deficit > 0) {
+          retVal = null;
+        } else {
+          throw new IllegalStateException("WTF?! No objects left, and no object deficit. This is probably a bug.");
         }
-
-
-        retVal = objectList.removeFirst();
       }
 
-      if (!factory.isGood(retVal)) {
-        // If current object is no good, close it and make a new one.
-        factory.close(retVal);
-        return factory.generate(key);
+      if (retVal != null && factory.isGood(retVal)) {
+        return retVal;
+      } else {
+        // Discard current object, if any, and make a new one.
+        try {
+          if (retVal != null) {
+            factory.close(retVal);
+          }
+          return factory.generate(key);
+        } catch (Throwable e) {
+          // Error creating a new object: increment deficit so we know our objectList is missing an item.
+          synchronized (this) {
+            deficit ++;
+            this.notifyAll();
+          }
+          throw Throwables.propagate(e);
+        }
       }
-
-      return retVal;
     }
 
     void giveBack(V object)
     {
+      Preconditions.checkNotNull(object, "object");
+
       synchronized (this) {
         if (closed) {
           log.info(String.format("giveBack called after being closed. key[%s]", key));
