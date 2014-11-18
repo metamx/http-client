@@ -151,7 +151,7 @@ public class ResourcePool<K, V> implements Closeable
     V get()
     {
       // objectList can't have nulls, so we'll use a null to signal that we need to create a new resource.
-      final V retVal;
+      final V poolVal;
       synchronized (this) {
         while (!closed && objectList.size() == 0 && deficit == 0) {
           try {
@@ -167,33 +167,36 @@ public class ResourcePool<K, V> implements Closeable
           log.info(String.format("get() called even though I'm closed. key[%s]", key));
           return null;
         } else if (!objectList.isEmpty()) {
-          retVal = objectList.removeFirst();
+          poolVal = objectList.removeFirst();
         } else if (deficit > 0) {
           deficit --;
-          retVal = null;
+          poolVal = null;
         } else {
           throw new IllegalStateException("WTF?! No objects left, and no object deficit. This is probably a bug.");
         }
       }
 
-      if (retVal != null && factory.isGood(retVal)) {
-        return retVal;
-      } else {
-        // Discard current object, if any, and make a new one.
-        try {
-          if (retVal != null) {
-            factory.close(retVal);
+      // At this point, we must either return a valid resource or increment "deficit".
+      final V retVal;
+      try {
+        if (poolVal != null && factory.isGood(poolVal)) {
+          retVal = poolVal;
+        } else {
+          if (poolVal != null) {
+            factory.close(poolVal);
           }
-          return factory.generate(key);
-        } catch (Throwable e) {
-          // Error creating a new object: increment deficit so we know our objectList is missing an item.
-          synchronized (this) {
-            deficit ++;
-            this.notifyAll();
-          }
-          throw Throwables.propagate(e);
+          retVal = factory.generate(key);
         }
       }
+      catch (Throwable e) {
+        synchronized (this) {
+          deficit++;
+          this.notifyAll();
+        }
+        throw Throwables.propagate(e);
+      }
+
+      return retVal;
     }
 
     void giveBack(V object)
