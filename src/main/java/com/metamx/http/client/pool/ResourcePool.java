@@ -169,6 +169,7 @@ public class ResourcePool<K, V> implements Closeable
         } else if (!objectList.isEmpty()) {
           retVal = objectList.removeFirst();
         } else if (deficit > 0) {
+          deficit --;
           retVal = null;
         } else {
           throw new IllegalStateException("WTF?! No objects left, and no object deficit. This is probably a bug.");
