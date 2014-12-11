@@ -16,6 +16,7 @@
 
 package com.metamx.http.client;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
@@ -80,25 +81,25 @@ public class HttpClient
       ResourcePool<String, ChannelFuture> pool
   )
   {
-    this(pool, false, null, null);
+    this(pool, false, null, null, null);
   }
 
   private HttpClient(
       ResourcePool<String, ChannelFuture> pool,
       boolean enforceSSL,
       Credentials credentials,
-      Duration readTimeout
+      Duration readTimeout,
+      Timer timer
   )
   {
-    this.pool = pool;
+    this.pool = Preconditions.checkNotNull(pool, "pool");
     this.enforceSSL = enforceSSL;
     this.credentials = credentials;
     this.readTimeout = readTimeout;
+    this.timer = timer;
 
-    if (readTimeout != null && readTimeout.getMillis() > 0) {
-      this.timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build());
-    } else {
-      this.timer = null;
+    if (hasTimeout()) {
+      Preconditions.checkNotNull(timer, "timer");
     }
   }
 
@@ -110,26 +111,27 @@ public class HttpClient
   @LifecycleStop
   public void stop()
   {
-    if (hasTimeout()) {
-      timer.stop();
-    }
-
     pool.close();
   }
 
   public HttpClient secureClient()
   {
-    return new HttpClient(pool, true, credentials, readTimeout);
+    return new HttpClient(pool, true, credentials, readTimeout, timer);
   }
 
   public HttpClient withCredentials(Credentials credentials)
   {
-    return new HttpClient(pool, enforceSSL, credentials, readTimeout);
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout, timer);
   }
 
   public HttpClient withReadTimeout(Duration readTimeout)
   {
-    return new HttpClient(pool, enforceSSL, credentials, readTimeout);
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout, timer);
+  }
+
+  public HttpClient withTimer(Timer timer)
+  {
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout, timer);
   }
 
   public <Intermediate, Final> ListenableFuture<Final> get(
@@ -414,7 +416,7 @@ public class HttpClient
 
   private boolean hasTimeout()
   {
-    return timer != null;
+    return readTimeout != null && readTimeout.getMillis() > 0;
   }
 
   private String getHost(URL url) {
