@@ -56,6 +56,18 @@
             <version>1.7.5</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>9.2.5.v20141112</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+            <version>9.2.5.v20141112</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
