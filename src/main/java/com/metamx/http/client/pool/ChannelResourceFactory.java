@@ -31,6 +31,7 @@ import org.jboss.netty.util.Timer;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -77,19 +78,20 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
       throw new RuntimeException(e);
     }
 
+    final String host = url.getHost();
+    final int port = url.getPort() == -1 ? url.getDefaultPort() : url.getPort();
     final ChannelFuture retVal;
-    final ChannelFuture connectFuture = bootstrap.connect(
-        new InetSocketAddress(
-            url.getHost(), url.getPort() == -1 ? url.getDefaultPort() : url.getPort()
-        )
-    );
+    final ChannelFuture connectFuture = bootstrap.connect(new InetSocketAddress(host, port));
 
     if ("https".equals(url.getProtocol())) {
       if (sslContext == null) {
         throw new IllegalStateException("No sslContext set, cannot do https");
       }
 
-      final SSLEngine sslEngine = sslContext.createSSLEngine();
+      final SSLEngine sslEngine = sslContext.createSSLEngine(host, port);
+      final SSLParameters sslParameters = new SSLParameters();
+      sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+      sslEngine.setSSLParameters(sslParameters);
       sslEngine.setUseClientMode(true);
       final SslHandler sslHandler = new SslHandler(
           sslEngine,

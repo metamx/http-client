@@ -69,8 +69,13 @@ public class HttpClientInit
       );
       return lifecycle.addMaybeStartManagedInstance(
           new HttpClient(
-              new ResourcePool<String, ChannelFuture>(
-                  new ChannelResourceFactory(createBootstrap(lifecycle, timer), config.getSslContext(), timer, -1),
+              new ResourcePool<>(
+                  new ChannelResourceFactory(
+                      createBootstrap(lifecycle, timer),
+                      config.getSslContext(),
+                      timer,
+                      config.getSslHandshakeTimeout() == null ? -1 : config.getSslHandshakeTimeout().getMillis()
+                  ),
                   new ResourcePoolConfig(config.getNumConnections())
               )
           ).withTimer(timer).withReadTimeout(config.getReadTimeout())

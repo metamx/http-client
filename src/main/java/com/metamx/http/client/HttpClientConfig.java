@@ -16,6 +16,7 @@ public class HttpClientConfig
   private final int numConnections;
   private final SSLContext sslContext;
   private final Duration readTimeout;
+  private final Duration sslHandshakeTimeout;
 
   @Deprecated
   public HttpClientConfig(
@@ -23,7 +24,7 @@ public class HttpClientConfig
       SSLContext sslContext
   )
   {
-    this(numConnections, sslContext, Duration.ZERO);
+    this(numConnections, sslContext, Duration.ZERO, null);
   }
 
   public HttpClientConfig(
@@ -32,9 +33,20 @@ public class HttpClientConfig
       Duration readTimeout
   )
   {
+    this(numConnections, sslContext, readTimeout, null);
+  }
+
+  public HttpClientConfig(
+      int numConnections,
+      SSLContext sslContext,
+      Duration readTimeout,
+      Duration sslHandshakeTimeout
+  )
+  {
     this.numConnections = numConnections;
     this.sslContext = sslContext;
     this.readTimeout = readTimeout;
+    this.sslHandshakeTimeout = sslHandshakeTimeout;
   }
 
   public int getNumConnections()
@@ -52,11 +64,17 @@ public class HttpClientConfig
     return readTimeout;
   }
 
+  public Duration getSslHandshakeTimeout()
+  {
+    return sslHandshakeTimeout;
+  }
+
   public static class Builder
   {
     private int numConnections = 1;
     private SSLContext sslContext = null;
     private Duration readTimeout = null;
+    private Duration sslHandshakeTimeout = null;
 
     private Builder(){}
 
@@ -83,9 +101,14 @@ public class HttpClientConfig
       return this;
     }
 
+    public Builder withSslHandshakeTimeout(Duration sslHandshakeTimeout) {
+      this.sslHandshakeTimeout = sslHandshakeTimeout;
+      return this;
+    }
+
     public HttpClientConfig build()
     {
-      return new HttpClientConfig(numConnections, sslContext, readTimeout);
+      return new HttpClientConfig(numConnections, sslContext, readTimeout, sslHandshakeTimeout);
     }
   }
 }
