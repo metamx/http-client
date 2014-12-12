@@ -17,7 +17,6 @@
 package com.metamx.http.client;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -28,7 +27,6 @@ import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
 import com.metamx.common.logger.Logger;
 import com.metamx.http.client.auth.Credentials;
-import com.metamx.http.client.netty.HandshakeRememberingSslHandler;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
@@ -39,6 +37,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
@@ -223,19 +222,15 @@ public class HttpClient
     }
     final String hostKey = getPoolKey(url);
     final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
-    final Channel channel = channelResourceContainer.get().awaitUninterruptibly().getChannel();
-
-    HandshakeRememberingSslHandler sslHandler = channel.getPipeline().get(HandshakeRememberingSslHandler.class);
-    if (sslHandler != null) {
-      try {
-        sslHandler.getHandshakeFutureOrHandshake().await();
-      }
-      catch (InterruptedException e) {
-        throw Throwables.propagate(e);
-      }
+    final ChannelFuture channelFuture = channelResourceContainer.get().awaitUninterruptibly();
+    if (!channelFuture.isSuccess()) {
+      channelResourceContainer.returnResource(); // Some other poor sap will have to deal with it...
+      throw new ChannelException("Faulty channel in resource pool", channelFuture.getCause());
     }
 
-    HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
+    final Channel channel = channelFuture.getChannel();
+
+    final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
       httpRequest.headers().add(HttpHeaders.Names.HOST, getHost(url));

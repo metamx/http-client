@@ -16,14 +16,18 @@
 
 package com.metamx.http.client.pool;
 
-import com.google.common.base.Throwables;
+import com.google.common.base.Preconditions;
 import com.metamx.common.logger.Logger;
-import com.metamx.http.client.netty.HandshakeRememberingSslHandler;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelPipeline;
+import org.jboss.netty.channel.Channels;
+import org.jboss.netty.handler.ssl.ImmediateExecutor;
+import org.jboss.netty.handler.ssl.SslHandler;
+import org.jboss.netty.util.Timer;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -32,29 +36,37 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 /**
-*/
+ */
 public class ChannelResourceFactory implements ResourceFactory<String, ChannelFuture>
 {
   private static final Logger log = new Logger(ChannelResourceFactory.class);
+
+  private static final long DEFAULT_SSL_HANDSHAKE_TIMEOUT = 10000L; /* 10 seconds */
+
   private final ClientBootstrap bootstrap;
   private final SSLContext sslContext;
-
-  public ChannelResourceFactory(ClientBootstrap bootstrap)
-  {
-    this(bootstrap, null);
-  }
+  private final Timer timer;
+  private final long sslHandshakeTimeout;
 
   public ChannelResourceFactory(
       ClientBootstrap bootstrap,
-      SSLContext sslContext
+      SSLContext sslContext,
+      Timer timer,
+      long sslHandshakeTimeout
   )
   {
-    this.bootstrap = bootstrap;
+    this.bootstrap = Preconditions.checkNotNull(bootstrap, "bootstrap");
     this.sslContext = sslContext;
+    this.timer = timer;
+    this.sslHandshakeTimeout = sslHandshakeTimeout >= 0 ? sslHandshakeTimeout : DEFAULT_SSL_HANDSHAKE_TIMEOUT;
+
+    if (sslContext != null) {
+      Preconditions.checkNotNull(timer, "timer is required when sslContext is present");
+    }
   }
 
   @Override
-  public ChannelFuture generate(String hostname)
+  public ChannelFuture generate(final String hostname)
   {
     log.info(String.format("Generating: %s", hostname));
     URL url = null;
@@ -65,7 +77,8 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
       throw new RuntimeException(e);
     }
 
-    final ChannelFuture retVal = bootstrap.connect(
+    final ChannelFuture retVal;
+    final ChannelFuture connectFuture = bootstrap.connect(
         new InetSocketAddress(
             url.getHost(), url.getPort() == -1 ? url.getDefaultPort() : url.getPort()
         )
@@ -78,21 +91,63 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
 
       final SSLEngine sslEngine = sslContext.createSSLEngine();
       sslEngine.setUseClientMode(true);
-      final HandshakeRememberingSslHandler sslHandler = new HandshakeRememberingSslHandler(sslEngine);
+      final SslHandler sslHandler = new SslHandler(
+          sslEngine,
+          SslHandler.getDefaultBufferPool(),
+          false,
+          ImmediateExecutor.INSTANCE,
+          timer,
+          sslHandshakeTimeout
+      );
 
-      final ChannelPipeline pipeline = retVal.getChannel().getPipeline();
+      // https://github.com/netty/netty/issues/160
+      sslHandler.setCloseOnSSLException(true);
+
+      final ChannelPipeline pipeline = connectFuture.getChannel().getPipeline();
       pipeline.addFirst("ssl", sslHandler);
 
-      retVal.addListener(
+      final ChannelFuture handshakeFuture = Channels.future(connectFuture.getChannel());
+      connectFuture.addListener(
           new ChannelFutureListener()
           {
             @Override
-            public void operationComplete(ChannelFuture future) throws Exception
+            public void operationComplete(ChannelFuture f) throws Exception
             {
-              sslHandler.getHandshakeFutureOrHandshake();
+              if (f.isSuccess()) {
+                sslHandler.handshake().addListener(
+                    new ChannelFutureListener()
+                    {
+                      @Override
+                      public void operationComplete(ChannelFuture f2) throws Exception
+                      {
+                        if (f2.isSuccess()) {
+                          handshakeFuture.setSuccess();
+                        } else {
+                          handshakeFuture.setFailure(
+                              new ChannelException(
+                                  String.format("Failed to handshake with host[%s]", hostname),
+                                  f2.getCause()
+                              )
+                          );
+                        }
+                      }
+                    }
+                );
+              } else {
+                handshakeFuture.setFailure(
+                    new ChannelException(
+                        String.format("Failed to connect to host[%s]", hostname),
+                        f.getCause()
+                    )
+                );
+              }
             }
           }
       );
+
+      retVal = handshakeFuture;
+    } else {
+      retVal = connectFuture;
     }
 
     return retVal;
@@ -103,25 +158,15 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
   {
     Channel channel = resource.awaitUninterruptibly().getChannel();
 
+    boolean isSuccess = resource.isSuccess();
     boolean isConnected = channel.isConnected();
     boolean isOpen = channel.isOpen();
 
-    boolean isHandshook = true;
-    HandshakeRememberingSslHandler sslHandler = channel.getPipeline().get(HandshakeRememberingSslHandler.class);
-    if (sslHandler != null) {
-      try {
-        sslHandler.getHandshakeFutureOrHandshake().await();
-      }
-      catch (InterruptedException e) {
-        throw Throwables.propagate(e);
-      }
-    }
-
     if (log.isTraceEnabled()) {
-      log.trace(String.format("isGood = isConnected[%s] && isOpen[%s]", isConnected, isOpen));
+      log.trace("isGood = isSucess[%s] && isConnected[%s] && isOpen[%s]", isSuccess, isConnected, isOpen);
     }
 
-    return isConnected && isOpen && isHandshook;
+    return isSuccess && isConnected && isOpen;
   }
 
   @Override
