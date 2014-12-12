@@ -17,8 +17,8 @@
 package com.metamx.http.client.pool;
 
 import com.google.common.base.Throwables;
+import com.metamx.common.logger.Logger;
 import com.metamx.http.client.netty.HandshakeRememberingSslHandler;
-import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
@@ -30,13 +30,12 @@ import javax.net.ssl.SSLEngine;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.NoSuchAlgorithmException;
 
 /**
 */
 public class ChannelResourceFactory implements ResourceFactory<String, ChannelFuture>
 {
-  private static final Logger log = Logger.getLogger(ChannelResourceFactory.class);
+  private static final Logger log = new Logger(ChannelResourceFactory.class);
   private final ClientBootstrap bootstrap;
   private final SSLContext sslContext;
 
