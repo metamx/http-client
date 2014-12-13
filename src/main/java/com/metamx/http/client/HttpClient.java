@@ -19,6 +19,7 @@ package com.metamx.http.client;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.metamx.common.IAE;
@@ -220,15 +221,23 @@ public class HttpClient
     if (log.isDebugEnabled()) {
       log.debug(String.format("[%s] starting", requestDesc));
     }
+
+    // Block while acquiring a channel from the pool, then complete the request asynchronously.
+    final Channel channel;
     final String hostKey = getPoolKey(url);
     final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
     final ChannelFuture channelFuture = channelResourceContainer.get().awaitUninterruptibly();
     if (!channelFuture.isSuccess()) {
       channelResourceContainer.returnResource(); // Some other poor sap will have to deal with it...
-      throw new ChannelException("Faulty channel in resource pool", channelFuture.getCause());
+      return Futures.immediateFailedFuture(
+          new ChannelException(
+              "Faulty channel in resource pool",
+              channelFuture.getCause()
+          )
+      );
+    } else {
+      channel = channelFuture.getChannel();
     }
-
-    final Channel channel = channelFuture.getChannel();
 
     final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 

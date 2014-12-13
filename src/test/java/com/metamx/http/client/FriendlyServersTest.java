@@ -1,6 +1,7 @@
 package com.metamx.http.client;
 
 import com.google.common.base.Charsets;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.http.client.response.StatusResponseHandler;
 import com.metamx.http.client.response.StatusResponseHolder;
@@ -26,6 +27,7 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -126,30 +128,34 @@ public class FriendlyServersTest
       Assert.assertEquals(404, status.getCode());
 
       // Incorrect name ("127.0.0.1")
-      ChannelException ea = null;
+      final ListenableFuture<StatusResponseHolder> response1 = trustingClient
+          .get(new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort())))
+          .go(new StatusResponseHandler(Charsets.UTF_8));
+
+      Throwable ea = null;
       try {
-        trustingClient
-            .get(new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+        response1.get();
       }
-      catch (ChannelException e1) {
-        ea = e1;
+      catch (ExecutionException e) {
+        ea = e.getCause();
       }
 
-      Assert.assertTrue("ChannelException thrown by 'go'", ea.getCause() instanceof ChannelException);
+      Assert.assertTrue("ChannelException thrown by 'get'", ea instanceof ChannelException);
       Assert.assertTrue("Expected error message", ea.getCause().getMessage().matches(".*Failed to handshake.*"));
 
       // Untrusting client
-      ChannelException eb = null;
+      final ListenableFuture<StatusResponseHolder> response2 = skepticalClient
+          .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
+          .go(new StatusResponseHandler(Charsets.UTF_8));
+
+      Throwable eb = null;
       try {
-        skepticalClient
-            .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+        response1.get();
       }
-      catch (ChannelException e1) {
-        eb = e1;
+      catch (ExecutionException e) {
+        eb = e.getCause();
       }
-      Assert.assertNotNull("ChannelException thrown by 'go'", eb);
+      Assert.assertNotNull("ChannelException thrown by 'get'", eb);
       Assert.assertTrue(
           "Root cause is SSLHandshakeException",
           eb.getCause().getCause() instanceof SSLHandshakeException
