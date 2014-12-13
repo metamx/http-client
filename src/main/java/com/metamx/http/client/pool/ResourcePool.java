@@ -22,7 +22,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
-import org.apache.log4j.Logger;
+import com.metamx.common.logger.Logger;
 
 import java.io.Closeable;
 import java.util.LinkedList;
@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class ResourcePool<K, V> implements Closeable
 {
-  private static final Logger log = Logger.getLogger(ResourcePool.class);
+  private static final Logger log = new Logger(ResourcePool.class);
   private final LoadingCache<K, ImmediateCreationResourceHolder<K, V>> pool;
   private final AtomicBoolean closed = new AtomicBoolean(false);
 

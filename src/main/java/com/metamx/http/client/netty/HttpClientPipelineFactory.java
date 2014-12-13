@@ -16,23 +16,16 @@
 
 package com.metamx.http.client.netty;
 
-import org.apache.log4j.Logger;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.DefaultChannelPipeline;
 import org.jboss.netty.handler.codec.http.HttpClientCodec;
 import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
-import org.jboss.netty.handler.ssl.SslHandler;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 
 /**
  */
 public class HttpClientPipelineFactory implements ChannelPipelineFactory
 {
-  private static final Logger log = Logger.getLogger(HttpClientPipelineFactory.class);
-
   @Override
   public ChannelPipeline getPipeline() throws Exception
   {

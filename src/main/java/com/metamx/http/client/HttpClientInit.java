@@ -10,9 +10,14 @@ import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.socket.nio.NioClientBossPool;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
+import org.jboss.netty.channel.socket.nio.NioWorkerPool;
 import org.jboss.netty.logging.InternalLoggerFactory;
 import org.jboss.netty.logging.Log4JLoggerFactory;
+import org.jboss.netty.util.HashedWheelTimer;
+import org.jboss.netty.util.ThreadNameDeterminer;
+import org.jboss.netty.util.Timer;
 import org.joda.time.Duration;
 
 import javax.net.ssl.SSLContext;
@@ -26,6 +31,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  */
@@ -34,13 +40,45 @@ public class HttpClientInit
   public static HttpClient createClient(HttpClientConfig config, Lifecycle lifecycle)
   {
     try {
+      // We need to use the full constructor in order to set a ThreadNameDeterminer. The other parameters are taken
+      // from the defaults in HashedWheelTimer's other constructors.
+      final HashedWheelTimer timer = new HashedWheelTimer(
+          new ThreadFactoryBuilder().setDaemon(true)
+                                    .setNameFormat("HttpClient-Timer-%s")
+                                    .build(),
+          ThreadNameDeterminer.CURRENT,
+          100,
+          TimeUnit.MILLISECONDS,
+          512
+      );
+      lifecycle.addHandler(
+          new Lifecycle.Handler()
+          {
+            @Override
+            public void start() throws Exception
+            {
+              timer.start();
+            }
+
+            @Override
+            public void stop()
+            {
+              timer.stop();
+            }
+          }
+      );
       return lifecycle.addMaybeStartManagedInstance(
           new HttpClient(
-              new ResourcePool<String, ChannelFuture>(
-                  new ChannelResourceFactory(createBootstrap(lifecycle), config.getSslContext()),
+              new ResourcePool<>(
+                  new ChannelResourceFactory(
+                      createBootstrap(lifecycle, timer),
+                      config.getSslContext(),
+                      timer,
+                      config.getSslHandshakeTimeout() == null ? -1 : config.getSslHandshakeTimeout().getMillis()
+                  ),
                   new ResourcePoolConfig(config.getNumConnections())
               )
-          ).withReadTimeout(config.getReadTimeout())
+          ).withTimer(timer).withReadTimeout(config.getReadTimeout())
       );
     }
     catch (Exception e) {
@@ -57,24 +95,38 @@ public class HttpClientInit
     );
   }
 
-  public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
+  public static ClientBootstrap createBootstrap(Lifecycle lifecycle, Timer timer)
   {
-    final ClientBootstrap bootstrap = new ClientBootstrap(
-        new NioClientSocketChannelFactory(
-            Executors.newCachedThreadPool(
-                new ThreadFactoryBuilder()
-                    .setDaemon(true)
-                    .setNameFormat("Netty-Boss-%s")
-                    .build()
-            ),
-            Executors.newCachedThreadPool(
-                new ThreadFactoryBuilder()
-                    .setDaemon(true)
-                    .setNameFormat("Netty-Worker-%s")
-                    .build()
-            )
-        )
+    // Default from NioClientSocketChannelFactory.DEFAULT_BOSS_COUNT, which is private:
+    final int bossCount = 1;
+
+    // Default from SelectorUtil.DEFAULT_IO_THREADS, which is private:
+    final int workerCount = Runtime.getRuntime().availableProcessors() * 2;
+
+    final NioClientBossPool bossPool = new NioClientBossPool(
+        Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("HttpClient-Netty-Boss-%s")
+                .build()
+        ),
+        bossCount,
+        timer,
+        ThreadNameDeterminer.CURRENT
     );
+
+    final NioWorkerPool workerPool = new NioWorkerPool(
+        Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("HttpClient-Netty-Worker-%s")
+                .build()
+        ),
+        workerCount,
+        ThreadNameDeterminer.CURRENT
+    );
+
+    final ClientBootstrap bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(bossPool, workerPool));
 
     bootstrap.setOption("keepAlive", true);
     bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
@@ -103,6 +155,12 @@ public class HttpClientInit
     }
 
     return bootstrap;
+  }
+
+  @Deprecated
+  public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
+  {
+    return createBootstrap(lifecycle, new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build()));
   }
 
   public static SSLContext sslContextWithTrustedKeyStore(final String keyStorePath, final String keyStorePassword)

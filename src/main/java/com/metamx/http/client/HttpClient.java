@@ -16,29 +16,28 @@
 
 package com.metamx.http.client;
 
-import com.google.common.base.Throwables;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.metamx.common.IAE;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
+import com.metamx.common.logger.Logger;
 import com.metamx.http.client.auth.Credentials;
-import com.metamx.http.client.netty.HandshakeRememberingSslHandler;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.ClientResponse;
 import com.metamx.http.client.response.HttpResponseHandler;
-import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
@@ -52,7 +51,6 @@ import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.jboss.netty.handler.timeout.ReadTimeoutHandler;
-import org.jboss.netty.util.HashedWheelTimer;
 import org.jboss.netty.util.Timer;
 import org.joda.time.Duration;
 
@@ -65,7 +63,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class HttpClient
 {
-  private static final Logger log = Logger.getLogger(HttpClient.class);
+  private static final Logger log = new Logger(HttpClient.class);
 
   private static final String READ_TIMEOUT_HANDLER_NAME = "read-timeout";
   private static final String LAST_HANDLER_NAME = "last-handler";
@@ -80,25 +78,25 @@ public class HttpClient
       ResourcePool<String, ChannelFuture> pool
   )
   {
-    this(pool, false, null, null);
+    this(pool, false, null, null, null);
   }
 
   private HttpClient(
       ResourcePool<String, ChannelFuture> pool,
       boolean enforceSSL,
       Credentials credentials,
-      Duration readTimeout
+      Duration readTimeout,
+      Timer timer
   )
   {
-    this.pool = pool;
+    this.pool = Preconditions.checkNotNull(pool, "pool");
     this.enforceSSL = enforceSSL;
     this.credentials = credentials;
     this.readTimeout = readTimeout;
+    this.timer = timer;
 
-    if (readTimeout != null && readTimeout.getMillis() > 0) {
-      this.timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build());
-    } else {
-      this.timer = null;
+    if (hasTimeout()) {
+      Preconditions.checkNotNull(timer, "timer");
     }
   }
 
@@ -110,26 +108,27 @@ public class HttpClient
   @LifecycleStop
   public void stop()
   {
-    if (hasTimeout()) {
-      timer.stop();
-    }
-
     pool.close();
   }
 
   public HttpClient secureClient()
   {
-    return new HttpClient(pool, true, credentials, readTimeout);
+    return new HttpClient(pool, true, credentials, readTimeout, timer);
   }
 
   public HttpClient withCredentials(Credentials credentials)
   {
-    return new HttpClient(pool, enforceSSL, credentials, readTimeout);
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout, timer);
   }
 
   public HttpClient withReadTimeout(Duration readTimeout)
   {
-    return new HttpClient(pool, enforceSSL, credentials, readTimeout);
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout, timer);
+  }
+
+  public HttpClient withTimer(Timer timer)
+  {
+    return new HttpClient(pool, enforceSSL, credentials, readTimeout, timer);
   }
 
   public <Intermediate, Final> ListenableFuture<Final> get(
@@ -223,19 +222,15 @@ public class HttpClient
     }
     final String hostKey = getPoolKey(url);
     final ResourceContainer<ChannelFuture> channelResourceContainer = pool.take(hostKey);
-    final Channel channel = channelResourceContainer.get().awaitUninterruptibly().getChannel();
-
-    HandshakeRememberingSslHandler sslHandler = channel.getPipeline().get(HandshakeRememberingSslHandler.class);
-    if (sslHandler != null) {
-      try {
-        sslHandler.getHandshakeFutureOrHandshake().await();
-      }
-      catch (InterruptedException e) {
-        throw Throwables.propagate(e);
-      }
+    final ChannelFuture channelFuture = channelResourceContainer.get().awaitUninterruptibly();
+    if (!channelFuture.isSuccess()) {
+      channelResourceContainer.returnResource(); // Some other poor sap will have to deal with it...
+      throw new ChannelException("Faulty channel in resource pool", channelFuture.getCause());
     }
 
-    HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
+    final Channel channel = channelFuture.getChannel();
+
+    final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
       httpRequest.headers().add(HttpHeaders.Names.HOST, getHost(url));
@@ -414,7 +409,7 @@ public class HttpClient
 
   private boolean hasTimeout()
   {
-    return timer != null;
+    return readTimeout != null && readTimeout.getMillis() > 0;
   }
 
   private String getHost(URL url) {
