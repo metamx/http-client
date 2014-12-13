@@ -2,8 +2,10 @@ package com.metamx.http.client;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
-
-import java.util.concurrent.Future;
+import com.metamx.http.client.pool.ResourceFactory;
+import com.metamx.http.client.pool.ResourcePool;
+import com.metamx.http.client.pool.ResourcePoolConfig;
+import org.jboss.netty.channel.ChannelFuture;
 
 /**
  */
@@ -13,7 +15,31 @@ public class MockHttpClient extends HttpClient
 
   public MockHttpClient()
   {
-    super(null);
+    super(
+        new ResourcePool<String, ChannelFuture>(
+            new ResourceFactory<String, ChannelFuture>()
+            {
+              @Override
+              public ChannelFuture generate(String key)
+              {
+                return null;
+              }
+
+              @Override
+              public boolean isGood(ChannelFuture resource)
+              {
+                return false;
+              }
+
+              @Override
+              public void close(ChannelFuture resource)
+              {
+
+              }
+            },
+            new ResourcePoolConfig(1)
+        )
+    );
   }
 
   public GoHandler getGoHandler()
