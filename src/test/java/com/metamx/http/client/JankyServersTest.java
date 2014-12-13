@@ -169,17 +169,19 @@ public class JankyServersTest
                                                       .build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
+      final ListenableFuture<StatusResponseHolder> response = client
+          .get(new URL(String.format("https://localhost:%d/", silentServerSocket.getLocalPort())))
+          .go(new StatusResponseHandler(Charsets.UTF_8));
+
       Throwable e = null;
       try {
-        client
-            .get(new URL(String.format("https://localhost:%d/", silentServerSocket.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+        response.get();
       }
-      catch (ChannelException e1) {
-        e = e1;
+      catch (ExecutionException e1) {
+        e = e1.getCause();
       }
 
-      Assert.assertTrue("ChannelException thrown by 'go'", e instanceof ChannelException);
+      Assert.assertTrue("ChannelException thrown by 'get'", e instanceof ChannelException);
     }
     finally {
       lifecycle.stop();
@@ -220,17 +222,19 @@ public class JankyServersTest
       final HttpClientConfig config = HttpClientConfig.builder().withSslContext(SSLContext.getDefault()).build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
-      ChannelException e = null;
+      final ListenableFuture<StatusResponseHolder> response = client
+          .get(new URL(String.format("https://localhost:%d/", closingServerSocket.getLocalPort())))
+          .go(new StatusResponseHandler(Charsets.UTF_8));
+
+      Throwable e = null;
       try {
-        client
-            .get(new URL(String.format("https://localhost:%d/", closingServerSocket.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+        response.get();
       }
-      catch (ChannelException e1) {
-        e = e1;
+      catch (ExecutionException e1) {
+        e = e1.getCause();
       }
 
-      Assert.assertTrue("ChannelException thrown by 'go'", e instanceof ChannelException);
+      Assert.assertTrue("ChannelException thrown by 'get'", e instanceof ChannelException);
     }
     finally {
       lifecycle.stop();
@@ -272,17 +276,19 @@ public class JankyServersTest
       final HttpClientConfig config = HttpClientConfig.builder().withSslContext(SSLContext.getDefault()).build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
-      ChannelException e = null;
+      final ListenableFuture<StatusResponseHolder> response = client
+          .get(new URL(String.format("https://localhost:%d/", echoServerSocket.getLocalPort())))
+          .go(new StatusResponseHandler(Charsets.UTF_8));
+
+      Throwable e = null;
       try {
-        client
-            .get(new URL(String.format("https://localhost:%d/", echoServerSocket.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+        response.get();
       }
-      catch (ChannelException e1) {
-        e = e1;
+      catch (ExecutionException e1) {
+        e = e1.getCause();
       }
 
-      Assert.assertNotNull("ChannelException thrown by 'go'", e);
+      Assert.assertNotNull("ChannelException thrown by 'get'", e);
     }
     finally {
       lifecycle.stop();
