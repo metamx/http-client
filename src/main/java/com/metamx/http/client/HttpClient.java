@@ -411,7 +411,27 @@ public class HttpClient
         }
     );
 
-    channel.write(httpRequest);
+    channel.write(httpRequest).addListener(
+        new ChannelFutureListener()
+        {
+          @Override
+          public void operationComplete(ChannelFuture future) throws Exception
+          {
+            if (!future.isSuccess()) {
+              channel.close();
+              channelResourceContainer.returnResource();
+              if (!retVal.isDone()) {
+                retVal.setException(
+                    new ChannelException(
+                        String.format("[%s] Failed to write request to channel", requestDesc),
+                        future.getCause()
+                    )
+                );
+              }
+            }
+          }
+        }
+    );
 
     return retVal;
   }

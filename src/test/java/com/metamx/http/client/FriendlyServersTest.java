@@ -89,7 +89,7 @@ public class FriendlyServersTest
   public void testFriendlySelfSignedHttpsServer() throws Exception
   {
     final Lifecycle lifecycle = new Lifecycle();
-    final String keyStorePath = JankyServersTest.class.getClassLoader().getResource("keystore.jks").getFile();
+    final String keyStorePath = getClass().getClassLoader().getResource("keystore.jks").getFile();
     Server server = new Server();
 
     HttpConfiguration https = new HttpConfiguration();
@@ -121,45 +121,51 @@ public class FriendlyServersTest
       final HttpClient skepticalClient = HttpClientInit.createClient(skepticalConfig, lifecycle);
 
       // Correct name ("localhost")
-      final HttpResponseStatus status = trustingClient
-          .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8))
-          .get().getStatus();
-      Assert.assertEquals(404, status.getCode());
+      {
+        final HttpResponseStatus status = trustingClient
+            .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
+            .go(new StatusResponseHandler(Charsets.UTF_8))
+            .get().getStatus();
+        Assert.assertEquals(404, status.getCode());
+      }
 
       // Incorrect name ("127.0.0.1")
-      final ListenableFuture<StatusResponseHolder> response1 = trustingClient
-          .get(new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+      {
+        final ListenableFuture<StatusResponseHolder> response1 = trustingClient
+            .get(new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort())))
+            .go(new StatusResponseHandler(Charsets.UTF_8));
 
-      Throwable ea = null;
-      try {
-        response1.get();
-      }
-      catch (ExecutionException e) {
-        ea = e.getCause();
+        Throwable ea = null;
+        try {
+          response1.get();
+        }
+        catch (ExecutionException e) {
+          ea = e.getCause();
+        }
+
+        Assert.assertTrue("ChannelException thrown by 'get'", ea instanceof ChannelException);
+        Assert.assertTrue("Expected error message", ea.getCause().getMessage().matches(".*Failed to handshake.*"));
       }
 
-      Assert.assertTrue("ChannelException thrown by 'get'", ea instanceof ChannelException);
-      Assert.assertTrue("Expected error message", ea.getCause().getMessage().matches(".*Failed to handshake.*"));
+      {
+        // Untrusting client
+        final ListenableFuture<StatusResponseHolder> response2 = skepticalClient
+            .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
+            .go(new StatusResponseHandler(Charsets.UTF_8));
 
-      // Untrusting client
-      final ListenableFuture<StatusResponseHolder> response2 = skepticalClient
-          .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
-
-      Throwable eb = null;
-      try {
-        response1.get();
+        Throwable eb = null;
+        try {
+          response2.get();
+        }
+        catch (ExecutionException e) {
+          eb = e.getCause();
+        }
+        Assert.assertNotNull("ChannelException thrown by 'get'", eb);
+        Assert.assertTrue(
+            "Root cause is SSLHandshakeException",
+            eb.getCause().getCause() instanceof SSLHandshakeException
+        );
       }
-      catch (ExecutionException e) {
-        eb = e.getCause();
-      }
-      Assert.assertNotNull("ChannelException thrown by 'get'", eb);
-      Assert.assertTrue(
-          "Root cause is SSLHandshakeException",
-          eb.getCause().getCause() instanceof SSLHandshakeException
-      );
     }
     finally {
       lifecycle.stop();
