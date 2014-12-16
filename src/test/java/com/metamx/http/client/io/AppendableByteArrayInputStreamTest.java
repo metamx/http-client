@@ -210,7 +210,7 @@ public class AppendableByteArrayInputStreamTest
           {
             try {
               byte[] readBytes = new byte[10];
-              in.read(readBytes);
+              while (in.read(readBytes) != -1);
               return readBytes;
             }
             catch (IOException e) {
