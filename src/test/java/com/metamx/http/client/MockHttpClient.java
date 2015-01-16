@@ -5,11 +5,12 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.http.client.pool.ResourceFactory;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
+import com.metamx.http.client.response.HttpResponseHandler;
 import org.jboss.netty.channel.ChannelFuture;
 
 /**
  */
-public class MockHttpClient extends HttpClient
+public class MockHttpClient extends NettyHttpClient
 {
   private volatile GoHandler goHandler;
 
@@ -59,11 +60,12 @@ public class MockHttpClient extends HttpClient
 
   @Override
   public <Intermediate, Final> ListenableFuture<Final> go(
-      Request<Intermediate, Final> request
+      Request request,
+      HttpResponseHandler<Intermediate, Final> handler
   )
   {
     try {
-      return goHandler.run(request);
+      return goHandler.run(request, handler);
     }
     catch (Exception e) {
       throw Throwables.propagate(e);

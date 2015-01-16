@@ -3,6 +3,7 @@ package com.metamx.http.client;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.ISE;
+import com.metamx.http.client.response.HttpResponseHandler;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -11,7 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class GoHandler
 {
   /******* Abstract Methods *********/
-  protected abstract <Intermediate, Final> ListenableFuture<Final> go(Request<Intermediate, Final> request) throws Exception;
+  protected abstract <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception;
 
   /******* Non Abstract Methods ********/
   private volatile boolean succeeded = false;
@@ -21,10 +22,10 @@ public abstract class GoHandler
     return succeeded;
   }
 
-  public <Intermediate, Final> ListenableFuture<Final> run(Request<Intermediate, Final> request) throws Exception
+  public <Intermediate, Final> ListenableFuture<Final> run(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
   {
     try {
-      final ListenableFuture<Final> retVal = go(request);
+      final ListenableFuture<Final> retVal = go(request, handler);
       succeeded = true;
       return retVal;
     }
@@ -44,10 +45,10 @@ public abstract class GoHandler
       AtomicInteger counter = new AtomicInteger(0);
 
       @Override
-      public <Intermediate, Final> ListenableFuture<Final> go(Request<Intermediate, Final> request) throws Exception
+      public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
       {
         if (counter.getAndIncrement() < n) {
-          return myself.go(request);
+          return myself.go(request, handler);
         }
         succeeded = false;
         throw new ISE("Called more than %d times", n);
