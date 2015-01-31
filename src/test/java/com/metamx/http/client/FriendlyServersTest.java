@@ -14,6 +14,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.jboss.netty.channel.ChannelException;
+import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -53,9 +54,7 @@ public class FriendlyServersTest
                   BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                   OutputStream out = clientSocket.getOutputStream()
               ) {
-                while (!in.readLine().equals("")) {
-                  ;
-                }
+                while (!in.readLine().equals("")); // skip lines
                 out.write("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nhello!".getBytes(Charsets.UTF_8));
               }
               catch (Exception e) {
@@ -71,9 +70,10 @@ public class FriendlyServersTest
       final HttpClientConfig config = HttpClientConfig.builder().build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
       final StatusResponseHolder response = client
-          .get(new URL(String.format("http://localhost:%d/", serverSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8))
-          .get();
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", serverSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          ).get();
 
       Assert.assertEquals(200, response.getStatus().getCode());
       Assert.assertEquals("hello!", response.getContent());
@@ -123,17 +123,20 @@ public class FriendlyServersTest
       // Correct name ("localhost")
       {
         final HttpResponseStatus status = trustingClient
-            .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8))
-            .get().getStatus();
+            .go(
+                new Request(HttpMethod.GET, new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort()))),
+                new StatusResponseHandler(Charsets.UTF_8)
+            ).get().getStatus();
         Assert.assertEquals(404, status.getCode());
       }
 
       // Incorrect name ("127.0.0.1")
       {
         final ListenableFuture<StatusResponseHolder> response1 = trustingClient
-            .get(new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+            .go(
+                new Request(HttpMethod.GET, new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort()))),
+                new StatusResponseHandler(Charsets.UTF_8)
+            );
 
         Throwable ea = null;
         try {
@@ -150,8 +153,12 @@ public class FriendlyServersTest
       {
         // Untrusting client
         final ListenableFuture<StatusResponseHolder> response2 = skepticalClient
-            .get(new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort())))
-            .go(new StatusResponseHandler(Charsets.UTF_8));
+            .go(
+                new Request(
+                    HttpMethod.GET, new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort()))
+                ),
+                new StatusResponseHandler(Charsets.UTF_8)
+            );
 
         Throwable eb = null;
         try {
@@ -183,20 +190,22 @@ public class FriendlyServersTest
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
       {
-        final HttpResponseStatus status = client
-            .get(new URL("https://httpbin.org/get"))
-            .go(new StatusResponseHandler(Charsets.UTF_8))
-            .get().getStatus();
+        final HttpResponseStatus status =client
+            .go(
+                new Request(HttpMethod.GET, new URL("https://httpbin.org/get")),
+                new StatusResponseHandler(Charsets.UTF_8)
+            ).get().getStatus();
 
         Assert.assertEquals(200, status.getCode());
       }
 
       {
         final HttpResponseStatus status = client
-            .post(new URL("https://httpbin.org/post"))
-            .setContent(new byte[]{'a', 'b', 'c', 1, 2, 3})
-            .go(new StatusResponseHandler(Charsets.UTF_8))
-            .get().getStatus();
+            .go(
+                new Request(HttpMethod.POST, new URL("https://httpbin.org/post"))
+                    .setContent(new byte[]{'a', 'b', 'c', 1, 2, 3}),
+                new StatusResponseHandler(Charsets.UTF_8)
+            ).get().getStatus();
 
         Assert.assertEquals(200, status.getCode());
       }

@@ -1,10 +1,10 @@
 package com.metamx.http.client.auth;
 
-import com.metamx.http.client.RequestBuilder;
+import com.metamx.http.client.Request;
 
 /**
  */
 public interface Credentials
 {
-  public RequestBuilder addCredentials(RequestBuilder builder);
+  public Request addCredentials(Request builder);
 }

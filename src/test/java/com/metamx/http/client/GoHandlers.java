@@ -3,6 +3,7 @@ package com.metamx.http.client;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.ISE;
+import com.metamx.http.client.response.HttpResponseHandler;
 
 import java.util.concurrent.Future;
 
@@ -15,7 +16,7 @@ public class GoHandlers
     return new GoHandler()
     {
       @Override
-      public <Intermediate, Final> ListenableFuture<Final> go(Request<Intermediate, Final> request) throws Exception
+      public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
       {
         throw new ISE("Shouldn't be called");
       }
@@ -28,7 +29,7 @@ public class GoHandlers
     {
       @SuppressWarnings("unchecked")
       @Override
-      public <Intermediate, Final> ListenableFuture<Final> go(Request<Intermediate, Final> request) throws Exception
+      public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
       {
         return Futures.immediateFuture((Final) retVal);
       }

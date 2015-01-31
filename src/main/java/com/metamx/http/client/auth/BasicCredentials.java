@@ -1,6 +1,6 @@
 package com.metamx.http.client.auth;
 
-import com.metamx.http.client.RequestBuilder;
+import com.metamx.http.client.Request;
 
 /**
  */
@@ -19,7 +19,7 @@ public class BasicCredentials implements Credentials
   }
 
   @Override
-  public RequestBuilder addCredentials(RequestBuilder builder)
+  public Request addCredentials(Request builder)
   {
     return builder.setBasicAuthentication(username, password);
   }

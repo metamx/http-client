@@ -67,7 +67,7 @@ public class HttpClientInit
           }
       );
       return lifecycle.addMaybeStartManagedInstance(
-          new HttpClient(
+          new NettyHttpClient(
               new ResourcePool<>(
                   new ChannelResourceFactory(
                       createBootstrap(lifecycle, timer),

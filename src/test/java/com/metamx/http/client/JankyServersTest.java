@@ -6,6 +6,7 @@ import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.http.client.response.StatusResponseHandler;
 import com.metamx.http.client.response.StatusResponseHolder;
 import org.jboss.netty.channel.ChannelException;
+import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.timeout.ReadTimeoutException;
 import org.joda.time.Duration;
 import org.junit.AfterClass;
@@ -129,8 +130,10 @@ public class JankyServersTest
       final HttpClientConfig config = HttpClientConfig.builder().withReadTimeout(new Duration(100)).build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
       final ListenableFuture<StatusResponseHolder> future = client
-          .get(new URL(String.format("http://localhost:%d/", silentServerSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", silentServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          );
 
       Throwable e = null;
       try {
@@ -159,8 +162,10 @@ public class JankyServersTest
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
       final ListenableFuture<StatusResponseHolder> response = client
-          .get(new URL(String.format("https://localhost:%d/", silentServerSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("https://localhost:%d/", silentServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          );
 
       Throwable e = null;
       try {
@@ -185,8 +190,10 @@ public class JankyServersTest
       final HttpClientConfig config = HttpClientConfig.builder().build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
       final ListenableFuture<StatusResponseHolder> response = client
-          .get(new URL(String.format("http://localhost:%d/", closingServerSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", closingServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          );
 
       Throwable e = null;
       try {
@@ -212,8 +219,10 @@ public class JankyServersTest
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
       final ListenableFuture<StatusResponseHolder> response = client
-          .get(new URL(String.format("https://localhost:%d/", closingServerSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("https://localhost:%d/", closingServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          );
 
       Throwable e = null;
       try {
@@ -238,8 +247,10 @@ public class JankyServersTest
       final HttpClientConfig config = HttpClientConfig.builder().build();
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
       final ListenableFuture<StatusResponseHolder> response = client
-          .get(new URL(String.format("http://localhost:%d/", echoServerSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", echoServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          );
 
       Throwable e = null;
       try {
@@ -266,8 +277,10 @@ public class JankyServersTest
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
       final ListenableFuture<StatusResponseHolder> response = client
-          .get(new URL(String.format("https://localhost:%d/", echoServerSocket.getLocalPort())))
-          .go(new StatusResponseHandler(Charsets.UTF_8));
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("https://localhost:%d/", echoServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          );
 
       Throwable e = null;
       try {
