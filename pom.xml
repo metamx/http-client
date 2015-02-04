@@ -56,8 +56,8 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git@github.com/metamx/http-client.git</connection>
-        <developerConnection>scm:git:git@github.com/metamx/http-client.git</developerConnection>
+        <connection>scm:git:ssh://git@github.com/metamx/http-client.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/metamx/http-client.git</developerConnection>
         <url>https://github.com/metamx/http-client.git</url>
     </scm>
 
@@ -150,6 +150,17 @@
                     <releaseProfiles>release</releaseProfiles>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.6.5</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -197,17 +208,6 @@
                                 </goals>
                             </execution>
                         </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>1.6.5</version>
-                        <extensions>true</extensions>
-                        <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>
