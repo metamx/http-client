@@ -66,7 +66,7 @@ public class HttpClientInit
           TimeUnit.MILLISECONDS,
           512
       );
-      lifecycle.addHandler(
+      lifecycle.addMaybeStartHandler(
           new Lifecycle.Handler()
           {
             @Override
