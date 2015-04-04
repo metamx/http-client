@@ -17,8 +17,8 @@
 package com.metamx.http.client;
 
 import com.google.common.base.Throwables;
-import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.metamx.common.guava.CloseQuietly;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.http.client.netty.HttpClientPipelineFactory;
 import com.metamx.http.client.pool.ChannelResourceFactory;
@@ -214,7 +214,7 @@ public class HttpClientInit
       throw Throwables.propagate(e);
     }
     finally {
-      Closeables.closeQuietly(in);
+      CloseQuietly.close(in);
     }
   }
 }
