@@ -19,7 +19,6 @@ package com.metamx.http.client.pool;
 import com.metamx.common.ISE;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,7 +41,7 @@ public class ResourcePoolTest
     EasyMock.replay(resourceFactory);
     pool = new ResourcePool<String, String>(
         resourceFactory,
-        new ResourcePoolConfig(2, false)
+        new ResourcePoolConfig(2)
     );
 
     EasyMock.verify(resourceFactory);

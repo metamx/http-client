@@ -97,7 +97,6 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
           sslEngine,
           SslHandler.getDefaultBufferPool(),
           false,
-          ImmediateExecutor.INSTANCE,
           timer,
           sslHandshakeTimeout
       );
