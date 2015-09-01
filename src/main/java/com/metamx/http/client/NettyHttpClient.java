@@ -123,7 +123,7 @@ public class NettyHttpClient implements HttpClient
 
     final String requestDesc = String.format("%s %s", method, url);
     if (log.isDebugEnabled()) {
-      log.debug(String.format("[%s] starting", requestDesc));
+      log.debug("[%s] starting", requestDesc);
     }
 
     // Block while acquiring a channel from the pool, then complete the request asynchronously.
@@ -187,7 +187,7 @@ public class NettyHttpClient implements HttpClient
           public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception
           {
             if (log.isDebugEnabled()) {
-              log.debug(String.format("[%s] messageReceived: %s", requestDesc, e.getMessage()));
+              log.debug("[%s] messageReceived: %s", requestDesc, e.getMessage());
             }
             try {
               Object msg = e.getMessage();
@@ -195,7 +195,7 @@ public class NettyHttpClient implements HttpClient
               if (msg instanceof HttpResponse) {
                 HttpResponse httpResponse = (HttpResponse) msg;
                 if (log.isDebugEnabled()) {
-                  log.debug(String.format("[%s] Got response: %s", requestDesc, httpResponse.getStatus()));
+                  log.debug("[%s] Got response: %s", requestDesc, httpResponse.getStatus());
                 }
 
                 response = handler.handleResponse(httpResponse);
@@ -210,12 +210,10 @@ public class NettyHttpClient implements HttpClient
                 HttpChunk httpChunk = (HttpChunk) msg;
                 if (log.isDebugEnabled()) {
                   log.debug(
-                      String.format(
-                          "[%s] Got chunk: %sB, last=%s",
-                          requestDesc,
-                          httpChunk.getContent().readableBytes(),
-                          httpChunk.isLast()
-                      )
+                      "[%s] Got chunk: %sB, last=%s",
+                      requestDesc,
+                      httpChunk.getContent().readableBytes(),
+                      httpChunk.isLast()
                   );
                 }
 
@@ -232,9 +230,7 @@ public class NettyHttpClient implements HttpClient
               }
             }
             catch (Exception ex) {
-              log.warn(
-                  String.format("[%s] Exception thrown while processing message, closing channel.", requestDesc), ex
-              );
+              log.warn(ex, "[%s] Exception thrown while processing message, closing channel.", requestDesc);
 
               if (!retVal.isDone()) {
                 retVal.set(null);
@@ -269,7 +265,12 @@ public class NettyHttpClient implements HttpClient
           public void exceptionCaught(ChannelHandlerContext context, ExceptionEvent event) throws Exception
           {
             if (log.isDebugEnabled()) {
-              log.debug(String.format("[%s] Caught exception", requestDesc), event.getCause());
+              final Throwable cause = event.getCause();
+              if (cause == null) {
+                log.debug("[%s] Caught exception", requestDesc);
+              } else {
+                log.debug(cause, "[%s] Caught exception", requestDesc);
+              }
             }
 
             retVal.setException(event.getCause());
@@ -295,7 +296,7 @@ public class NettyHttpClient implements HttpClient
           public void channelDisconnected(ChannelHandlerContext context, ChannelStateEvent event) throws Exception
           {
             if (log.isDebugEnabled()) {
-              log.debug(String.format("[%s] Channel disconnected", requestDesc));
+              log.debug("[%s] Channel disconnected", requestDesc);
             }
             // response is non-null if we received initial chunk and then exception occurs
             if (response != null) {
@@ -304,7 +305,7 @@ public class NettyHttpClient implements HttpClient
             channel.close();
             channelResourceContainer.returnResource();
             if (!retVal.isDone()) {
-              log.warn(String.format("[%s] Channel disconnected before response complete", requestDesc));
+              log.warn("[%s] Channel disconnected before response complete", requestDesc);
               retVal.setException(new ChannelException("Channel disconnected"));
             }
             context.sendUpstream(event);
