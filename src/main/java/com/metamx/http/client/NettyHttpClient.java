@@ -17,24 +17,19 @@
 package com.metamx.http.client;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMultimap;
+import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.metamx.common.IAE;
-import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.common.lifecycle.LifecycleStart;
 import com.metamx.common.lifecycle.LifecycleStop;
 import com.metamx.common.logger.Logger;
-import com.metamx.http.client.auth.Credentials;
 import com.metamx.http.client.pool.ResourceContainer;
 import com.metamx.http.client.pool.ResourcePool;
-import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.ClientResponse;
 import com.metamx.http.client.response.HttpResponseHandler;
-import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelFuture;
@@ -62,7 +57,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  */
-public class NettyHttpClient implements HttpClient {
+public class NettyHttpClient implements HttpClient
+{
   private static final Logger log = new Logger(NettyHttpClient.class);
 
   private static final String READ_TIMEOUT_HANDLER_NAME = "read-timeout";
@@ -147,7 +143,12 @@ public class NettyHttpClient implements HttpClient {
       channel = channelFuture.getChannel();
     }
 
-    final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, url.getFile());
+    final String urlFile = Strings.nullToEmpty(url.getFile());
+    final HttpRequest httpRequest = new DefaultHttpRequest(
+        HttpVersion.HTTP_1_1,
+        method,
+        urlFile.isEmpty() ? "/" : urlFile
+    );
 
     if (!headers.containsKey(HttpHeaders.Names.HOST)) {
       httpRequest.headers().add(HttpHeaders.Names.HOST, getHost(url));
@@ -349,7 +350,8 @@ public class NettyHttpClient implements HttpClient {
     return readTimeout != null && readTimeout.getMillis() > 0;
   }
 
-  private String getHost(URL url) {
+  private String getHost(URL url)
+  {
     int port = url.getPort();
 
     if (port == -1) {
@@ -357,11 +359,9 @@ public class NettyHttpClient implements HttpClient {
 
       if ("http".equalsIgnoreCase(protocol)) {
         port = 80;
-      }
-      else if ("https".equalsIgnoreCase(protocol)) {
+      } else if ("https".equalsIgnoreCase(protocol)) {
         port = 443;
-      }
-      else {
+      } else {
         throw new IAE("Cannot figure out default port for protocol[%s], please set Host header.", protocol);
       }
     }
