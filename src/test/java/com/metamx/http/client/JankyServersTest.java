@@ -21,6 +21,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.http.client.response.StatusResponseHandler;
 import com.metamx.http.client.response.StatusResponseHolder;
+import java.io.IOException;
 import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.timeout.ReadTimeoutException;
@@ -210,16 +211,16 @@ public class JankyServersTest
               new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", closingServerSocket.getLocalPort()))),
               new StatusResponseHandler(Charsets.UTF_8)
           );
-
       Throwable e = null;
       try {
         response.get();
       }
       catch (ExecutionException e1) {
         e = e1.getCause();
+        e1.printStackTrace();
       }
 
-      Assert.assertTrue("ChannelException thrown by 'get'", e instanceof ChannelException);
+      Assert.assertTrue("ChannelException thrown by 'get'", isChannelClosedException(e));
     }
     finally {
       lifecycle.stop();
@@ -246,13 +247,20 @@ public class JankyServersTest
       }
       catch (ExecutionException e1) {
         e = e1.getCause();
+        e1.printStackTrace();
       }
 
-      Assert.assertTrue("ChannelException thrown by 'get'", e instanceof ChannelException);
+      Assert.assertTrue("ChannelException thrown by 'get'", isChannelClosedException(e));
     }
     finally {
       lifecycle.stop();
     }
+  }
+
+  public boolean isChannelClosedException(Throwable e)
+  {
+    return e instanceof ChannelException ||
+           (e instanceof IOException && e.getMessage().matches(".*Connection reset by peer.*"));
   }
 
   @Test
