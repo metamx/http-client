@@ -69,7 +69,7 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
   @Override
   public ChannelFuture generate(final String hostname)
   {
-    log.info(String.format("Generating: %s", hostname));
+    log.info("Generating: %s", hostname);
     URL url = null;
     try {
       url = new URL(hostname);
