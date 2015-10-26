@@ -23,6 +23,7 @@ import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.HttpResponseHandler;
 import org.jboss.netty.channel.ChannelFuture;
+import org.joda.time.Duration;
 
 /**
  */
@@ -77,11 +78,12 @@ public class MockHttpClient extends NettyHttpClient
   @Override
   public <Intermediate, Final> ListenableFuture<Final> go(
       Request request,
-      HttpResponseHandler<Intermediate, Final> handler
+      HttpResponseHandler<Intermediate, Final> handler,
+      Duration requestReadTimeout
   )
   {
     try {
-      return goHandler.run(request, handler);
+      return goHandler.run(request, handler, requestReadTimeout);
     }
     catch (Exception e) {
       throw Throwables.propagate(e);
