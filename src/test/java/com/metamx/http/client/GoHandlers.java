@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.ISE;
 import com.metamx.http.client.response.HttpResponseHandler;
+import org.joda.time.Duration;
 
 import java.util.concurrent.Future;
 
@@ -32,7 +33,11 @@ public class GoHandlers
     return new GoHandler()
     {
       @Override
-      public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
+      public <Intermediate, Final> ListenableFuture<Final> go(
+          Request request,
+          HttpResponseHandler<Intermediate, Final> handler,
+          Duration requestReadTimeout
+      ) throws Exception
       {
         throw new ISE("Shouldn't be called");
       }
@@ -45,7 +50,11 @@ public class GoHandlers
     {
       @SuppressWarnings("unchecked")
       @Override
-      public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
+      public <Intermediate, Final> ListenableFuture<Final> go(
+          Request request,
+          HttpResponseHandler<Intermediate, Final> handler,
+          Duration requestReadTimeout
+      ) throws Exception
       {
         return Futures.immediateFuture((Final) retVal);
       }

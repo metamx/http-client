@@ -23,12 +23,13 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.http.client.auth.Credentials;
 import com.metamx.http.client.response.HttpResponseHandler;
 import org.jboss.netty.handler.codec.http.HttpMethod;
+import org.joda.time.Duration;
 
 import java.net.URL;
 
 /**
  */
-public class CredentialedHttpClient implements HttpClient
+public class CredentialedHttpClient extends AbstractHttpClient
 {
 
   private final Credentials creds;
@@ -41,7 +42,12 @@ public class CredentialedHttpClient implements HttpClient
   }
 
   @Override
-  public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) {
-    return delegate.go(creds.addCredentials(request), handler);
+  public <Intermediate, Final> ListenableFuture<Final> go(
+      Request request,
+      HttpResponseHandler<Intermediate, Final> handler,
+      Duration requestReadTimeout
+  )
+  {
+    return delegate.go(creds.addCredentials(request), handler, requestReadTimeout);
   }
 }

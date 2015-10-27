@@ -20,6 +20,7 @@ import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.ISE;
 import com.metamx.http.client.response.HttpResponseHandler;
+import org.joda.time.Duration;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -28,7 +29,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class GoHandler
 {
   /******* Abstract Methods *********/
-  protected abstract <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception;
+  protected abstract <Intermediate, Final> ListenableFuture<Final> go(
+      Request request,
+      HttpResponseHandler<Intermediate, Final> handler,
+      Duration requestReadTimeout
+  ) throws Exception;
 
   /******* Non Abstract Methods ********/
   private volatile boolean succeeded = false;
@@ -38,10 +43,22 @@ public abstract class GoHandler
     return succeeded;
   }
 
-  public <Intermediate, Final> ListenableFuture<Final> run(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
+  public <Intermediate, Final> ListenableFuture<Final> run(
+      Request request,
+      HttpResponseHandler<Intermediate, Final> handler
+  ) throws Exception
+  {
+    return run(request, handler, null);
+  }
+
+  public <Intermediate, Final> ListenableFuture<Final> run(
+      Request request,
+      HttpResponseHandler<Intermediate, Final> handler,
+      Duration requestReadTimeout
+  ) throws Exception
   {
     try {
-      final ListenableFuture<Final> retVal = go(request, handler);
+      final ListenableFuture<Final> retVal = go(request, handler, requestReadTimeout);
       succeeded = true;
       return retVal;
     }
@@ -61,10 +78,14 @@ public abstract class GoHandler
       AtomicInteger counter = new AtomicInteger(0);
 
       @Override
-      public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) throws Exception
+      public <Intermediate, Final> ListenableFuture<Final> go(
+          final Request request,
+          final HttpResponseHandler<Intermediate, Final> handler,
+          final Duration requestReadTimeout
+      ) throws Exception
       {
         if (counter.getAndIncrement() < n) {
-          return myself.go(request, handler);
+          return myself.go(request, handler, requestReadTimeout);
         }
         succeeded = false;
         throw new ISE("Called more than %d times", n);

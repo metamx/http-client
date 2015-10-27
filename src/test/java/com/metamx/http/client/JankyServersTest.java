@@ -140,7 +140,7 @@ public class JankyServersTest
   }
 
   @Test
-  public void testHttpSilentServer() throws Throwable
+  public void testHttpSilentServerWithGlobalTimeout() throws Throwable
   {
     final Lifecycle lifecycle = new Lifecycle();
     try {
@@ -150,6 +150,35 @@ public class JankyServersTest
           .go(
               new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", silentServerSocket.getLocalPort()))),
               new StatusResponseHandler(Charsets.UTF_8)
+          );
+
+      Throwable e = null;
+      try {
+        future.get();
+      }
+      catch (ExecutionException e1) {
+        e = e1.getCause();
+      }
+
+      Assert.assertTrue("ReadTimeoutException thrown by 'get'", e instanceof ReadTimeoutException);
+    }
+    finally {
+      lifecycle.stop();
+    }
+  }
+
+  @Test
+  public void testHttpSilentServerWithRequestTimeout() throws Throwable
+  {
+    final Lifecycle lifecycle = new Lifecycle();
+    try {
+      final HttpClientConfig config = HttpClientConfig.builder().withReadTimeout(new Duration(86400L * 365)).build();
+      final HttpClient client = HttpClientInit.createClient(config, lifecycle);
+      final ListenableFuture<StatusResponseHolder> future = client
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", silentServerSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8),
+              new Duration(100L)
           );
 
       Throwable e = null;

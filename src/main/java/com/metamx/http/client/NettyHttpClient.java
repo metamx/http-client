@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  */
-public class NettyHttpClient implements HttpClient
+public class NettyHttpClient extends AbstractHttpClient
 {
   private static final Logger log = new Logger(NettyHttpClient.class);
 
@@ -66,7 +66,7 @@ public class NettyHttpClient implements HttpClient
 
   private final Timer timer;
   private final ResourcePool<String, ChannelFuture> pool;
-  private final Duration readTimeout;
+  private final Duration defaultReadTimeout;
 
   public NettyHttpClient(
       ResourcePool<String, ChannelFuture> pool
@@ -77,15 +77,15 @@ public class NettyHttpClient implements HttpClient
 
   private NettyHttpClient(
       ResourcePool<String, ChannelFuture> pool,
-      Duration readTimeout,
+      Duration defaultReadTimeout,
       Timer timer
   )
   {
     this.pool = Preconditions.checkNotNull(pool, "pool");
-    this.readTimeout = readTimeout;
+    this.defaultReadTimeout = defaultReadTimeout;
     this.timer = timer;
 
-    if (hasTimeout()) {
+    if (defaultReadTimeout != null && defaultReadTimeout.getMillis() > 0) {
       Preconditions.checkNotNull(timer, "timer");
     }
   }
@@ -108,13 +108,14 @@ public class NettyHttpClient implements HttpClient
 
   public NettyHttpClient withTimer(Timer timer)
   {
-    return new NettyHttpClient(pool, readTimeout, timer);
+    return new NettyHttpClient(pool, defaultReadTimeout, timer);
   }
 
   @Override
   public <Intermediate, Final> ListenableFuture<Final> go(
       final Request request,
-      final HttpResponseHandler<Intermediate, Final> handler
+      final HttpResponseHandler<Intermediate, Final> handler,
+      final Duration requestReadTimeout
   )
   {
     final HttpMethod method = request.getMethod();
@@ -168,12 +169,13 @@ public class NettyHttpClient implements HttpClient
       httpRequest.setContent(request.getContent());
     }
 
+    final long readTimeout = getReadTimeout(requestReadTimeout);
     final SettableFuture<Final> retVal = SettableFuture.create();
 
-    if (hasTimeout()) {
+    if (readTimeout > 0) {
       channel.getPipeline().addLast(
           READ_TIMEOUT_HANDLER_NAME,
-          new ReadTimeoutHandler(timer, readTimeout.getMillis(), TimeUnit.MILLISECONDS)
+          new ReadTimeoutHandler(timer, readTimeout, TimeUnit.MILLISECONDS)
       );
     }
 
@@ -313,7 +315,7 @@ public class NettyHttpClient implements HttpClient
 
           private void removeHandlers()
           {
-            if (hasTimeout()) {
+            if (readTimeout > 0) {
               channel.getPipeline().remove(READ_TIMEOUT_HANDLER_NAME);
             }
             channel.getPipeline().remove(LAST_HANDLER_NAME);
@@ -346,9 +348,23 @@ public class NettyHttpClient implements HttpClient
     return retVal;
   }
 
-  private boolean hasTimeout()
+  private long getReadTimeout(Duration requestReadTimeout)
   {
-    return readTimeout != null && readTimeout.getMillis() > 0;
+    final long timeout;
+    if (requestReadTimeout != null) {
+      timeout = requestReadTimeout.getMillis();
+    } else if (defaultReadTimeout != null) {
+      timeout = defaultReadTimeout.getMillis();
+    } else {
+      timeout = 0;
+    }
+
+    if (timeout > 0 && timer == null) {
+      log.warn("Cannot time out requests without a timer! Disabling timeout for this request.");
+      return 0;
+    } else {
+      return timeout;
+    }
   }
 
   private String getHost(URL url)

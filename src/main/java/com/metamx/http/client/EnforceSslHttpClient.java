@@ -21,29 +21,37 @@ package com.metamx.http.client;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.http.client.response.HttpResponseHandler;
+import org.joda.time.Duration;
 
 import java.net.URL;
 
 /**
  */
-public class EnforceSslHttpClient implements HttpClient {
+public class EnforceSslHttpClient extends AbstractHttpClient
+{
 
   private final HttpClient delegate;
 
   public EnforceSslHttpClient(
       HttpClient delegate
-  ) {
+  )
+  {
     this.delegate = delegate;
   }
 
   @Override
-  public <Intermediate, Final> ListenableFuture<Final> go(Request request, HttpResponseHandler<Intermediate, Final> handler) {
+  public <Intermediate, Final> ListenableFuture<Final> go(
+      Request request,
+      HttpResponseHandler<Intermediate, Final> handler,
+      Duration requestReadTimeout
+  )
+  {
     URL url = request.getUrl();
 
     if (!"https".equals(url.getProtocol())) {
       throw new IllegalArgumentException(String.format("Requests must be over https, got[%s].", url));
     }
 
-    return delegate.go(request, handler);
+    return delegate.go(request, handler, requestReadTimeout);
   }
 }
