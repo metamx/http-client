@@ -24,6 +24,12 @@ import javax.net.ssl.SSLContext;
  */
 public class HttpClientConfig
 {
+  // Default from NioClientSocketChannelFactory.DEFAULT_BOSS_COUNT, which is private:
+  private static final int DEFAULT_BOSS_COUNT = 1;
+
+  // Default from SelectorUtil.DEFAULT_IO_THREADS, which is private:
+  private static final int DEFAULT_WORKER_COUNT = Runtime.getRuntime().availableProcessors() * 2;
+
   public static Builder builder()
   {
     return new Builder();
@@ -33,25 +39,29 @@ public class HttpClientConfig
   private final SSLContext sslContext;
   private final Duration readTimeout;
   private final Duration sslHandshakeTimeout;
+  private final int bossPoolSize;
+  private final int workerPoolSize;
 
-  @Deprecated
+  @Deprecated // Use the builder instead
   public HttpClientConfig(
       int numConnections,
       SSLContext sslContext
   )
   {
-    this(numConnections, sslContext, Duration.ZERO, null);
+    this(numConnections, sslContext, Duration.ZERO, null, DEFAULT_BOSS_COUNT, DEFAULT_WORKER_COUNT);
   }
 
+  @Deprecated // Use the builder instead
   public HttpClientConfig(
       int numConnections,
       SSLContext sslContext,
       Duration readTimeout
   )
   {
-    this(numConnections, sslContext, readTimeout, null);
+    this(numConnections, sslContext, readTimeout, null, DEFAULT_BOSS_COUNT, DEFAULT_WORKER_COUNT);
   }
 
+  @Deprecated // Use the builder instead
   public HttpClientConfig(
       int numConnections,
       SSLContext sslContext,
@@ -59,10 +69,24 @@ public class HttpClientConfig
       Duration sslHandshakeTimeout
   )
   {
+    this(numConnections, sslContext, readTimeout, sslHandshakeTimeout, DEFAULT_BOSS_COUNT, DEFAULT_WORKER_COUNT);
+  }
+
+  private HttpClientConfig(
+      int numConnections,
+      SSLContext sslContext,
+      Duration readTimeout,
+      Duration sslHandshakeTimeout,
+      int bossPoolSize,
+      int workerPoolSize
+  )
+  {
     this.numConnections = numConnections;
     this.sslContext = sslContext;
     this.readTimeout = readTimeout;
     this.sslHandshakeTimeout = sslHandshakeTimeout;
+    this.bossPoolSize = bossPoolSize;
+    this.workerPoolSize = workerPoolSize;
   }
 
   public int getNumConnections()
@@ -85,14 +109,26 @@ public class HttpClientConfig
     return sslHandshakeTimeout;
   }
 
+  public int getBossPoolSize()
+  {
+    return bossPoolSize;
+  }
+
+  public int getWorkerPoolSize()
+  {
+    return workerPoolSize;
+  }
+
   public static class Builder
   {
     private int numConnections = 1;
     private SSLContext sslContext = null;
     private Duration readTimeout = null;
     private Duration sslHandshakeTimeout = null;
+    private int bossCount = DEFAULT_BOSS_COUNT;
+    private int workerCount = DEFAULT_WORKER_COUNT;
 
-    private Builder(){}
+    private Builder() {}
 
     public Builder withNumConnections(int numConnections)
     {
@@ -112,19 +148,33 @@ public class HttpClientConfig
       return this;
     }
 
-    public Builder withReadTimeout(Duration readTimeout) {
+    public Builder withReadTimeout(Duration readTimeout)
+    {
       this.readTimeout = readTimeout;
       return this;
     }
 
-    public Builder withSslHandshakeTimeout(Duration sslHandshakeTimeout) {
+    public Builder withSslHandshakeTimeout(Duration sslHandshakeTimeout)
+    {
       this.sslHandshakeTimeout = sslHandshakeTimeout;
+      return this;
+    }
+
+    public Builder withBossCount(int bossCount)
+    {
+      this.bossCount = bossCount;
+      return this;
+    }
+
+    public Builder withWorkerCount(int workerCount)
+    {
+      this.workerCount = workerCount;
       return this;
     }
 
     public HttpClientConfig build()
     {
-      return new HttpClientConfig(numConnections, sslContext, readTimeout, sslHandshakeTimeout);
+      return new HttpClientConfig(numConnections, sslContext, readTimeout, sslHandshakeTimeout, bossCount, workerCount);
     }
   }
 }
