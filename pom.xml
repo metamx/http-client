@@ -25,7 +25,7 @@
     </parent>
 
     <artifactId>http-client</artifactId>
-    <version>1.0.5-SNAPSHOT</version>
+    <version>1.0.5</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>An HTTP client using Netty</description>
@@ -63,7 +63,7 @@
         <connection>scm:git:ssh://git@github.com/metamx/http-client.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/metamx/http-client.git</developerConnection>
         <url>https://github.com/metamx/http-client.git</url>
-        <tag>HEAD</tag>
+        <tag>http-client-1.0.5</tag>
     </scm>
 
     <dependencies>
