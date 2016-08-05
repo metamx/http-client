@@ -86,7 +86,7 @@ public class HttpClientInit
           new NettyHttpClient(
               new ResourcePool<>(
                   new ChannelResourceFactory(
-                      createBootstrap(lifecycle, timer),
+                      createBootstrap(lifecycle, timer, config.getBossPoolSize(), config.getWorkerPoolSize()),
                       config.getSslContext(),
                       timer,
                       config.getSslHandshakeTimeout() == null ? -1 : config.getSslHandshakeTimeout().getMillis()
@@ -110,72 +110,18 @@ public class HttpClientInit
     );
   }
 
+  @Deprecated // use createClient directly
   public static ClientBootstrap createBootstrap(Lifecycle lifecycle, Timer timer)
   {
-    // Default from NioClientSocketChannelFactory.DEFAULT_BOSS_COUNT, which is private:
-    final int bossCount = 1;
-
-    // Default from SelectorUtil.DEFAULT_IO_THREADS, which is private:
-    final int workerCount = Runtime.getRuntime().availableProcessors() * 2;
-
-    final NioClientBossPool bossPool = new NioClientBossPool(
-        Executors.newCachedThreadPool(
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("HttpClient-Netty-Boss-%s")
-                .build()
-        ),
-        bossCount,
-        timer,
-        ThreadNameDeterminer.CURRENT
-    );
-
-    final NioWorkerPool workerPool = new NioWorkerPool(
-        Executors.newCachedThreadPool(
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("HttpClient-Netty-Worker-%s")
-                .build()
-        ),
-        workerCount,
-        ThreadNameDeterminer.CURRENT
-    );
-
-    final ClientBootstrap bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(bossPool, workerPool));
-
-    bootstrap.setOption("keepAlive", true);
-    bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
-
-    InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
-
-    try {
-      lifecycle.addMaybeStartHandler(
-          new Lifecycle.Handler()
-          {
-            @Override
-            public void start() throws Exception
-            {
-            }
-
-            @Override
-            public void stop()
-            {
-              bootstrap.releaseExternalResources();
-            }
-          }
-      );
-    }
-    catch (Exception e) {
-      throw Throwables.propagate(e);
-    }
-
-    return bootstrap;
+    final HttpClientConfig defaultConfig = HttpClientConfig.builder().build();
+    return createBootstrap(lifecycle, timer, defaultConfig.getBossPoolSize(), defaultConfig.getWorkerPoolSize());
   }
 
-  @Deprecated
+  @Deprecated // use createClient directly
   public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
   {
-    return createBootstrap(lifecycle, new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build()));
+    final Timer timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build());
+    return createBootstrap(lifecycle, timer);
   }
 
   public static SSLContext sslContextWithTrustedKeyStore(final String keyStorePath, final String keyStorePassword)
@@ -216,5 +162,61 @@ public class HttpClientInit
     finally {
       CloseQuietly.close(in);
     }
+  }
+
+  private static ClientBootstrap createBootstrap(Lifecycle lifecycle, Timer timer, int bossPoolSize, int workerPoolSize)
+  {
+    final NioClientBossPool bossPool = new NioClientBossPool(
+        Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("HttpClient-Netty-Boss-%s")
+                .build()
+        ),
+        bossPoolSize,
+        timer,
+        ThreadNameDeterminer.CURRENT
+    );
+
+    final NioWorkerPool workerPool = new NioWorkerPool(
+        Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("HttpClient-Netty-Worker-%s")
+                .build()
+        ),
+        workerPoolSize,
+        ThreadNameDeterminer.CURRENT
+    );
+
+    final ClientBootstrap bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(bossPool, workerPool));
+
+    bootstrap.setOption("keepAlive", true);
+    bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
+
+    InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
+
+    try {
+      lifecycle.addMaybeStartHandler(
+          new Lifecycle.Handler()
+          {
+            @Override
+            public void start() throws Exception
+            {
+            }
+
+            @Override
+            public void stop()
+            {
+              bootstrap.releaseExternalResources();
+            }
+          }
+      );
+    }
+    catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+
+    return bootstrap;
   }
 }
