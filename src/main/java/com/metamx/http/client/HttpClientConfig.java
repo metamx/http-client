@@ -24,6 +24,43 @@ import javax.net.ssl.SSLContext;
  */
 public class HttpClientConfig
 {
+  public enum CompressionCodec
+  {
+    IDENTITY {
+      @Override
+      public String getEncodingString()
+      {
+        return "identity";
+      }
+    },
+    GZIP {
+      @Override
+      public String getEncodingString()
+      {
+        return "gzip";
+      }
+    },
+    DEFLATE {
+      @Override
+      public String getEncodingString()
+      {
+        return "deflate";
+      }
+    };
+
+    /**
+     * Get the header-ified name of this encoding, which should go in "Accept-Encoding" and
+     * "Content-Encoding" headers. This is not just the lowercasing of the enum name, since
+     * we may one day support x- encodings like LZ4, which would likely be an enum named
+     * "LZ4" that has an encoding string like "x-lz4".
+     *
+     * @return encoding name
+     */
+    public abstract String getEncodingString();
+  }
+
+  public static final CompressionCodec DEFAULT_COMPRESSION_CODEC = CompressionCodec.GZIP;
+
   // Default from NioClientSocketChannelFactory.DEFAULT_BOSS_COUNT, which is private:
   private static final int DEFAULT_BOSS_COUNT = 1;
 
@@ -41,6 +78,7 @@ public class HttpClientConfig
   private final Duration sslHandshakeTimeout;
   private final int bossPoolSize;
   private final int workerPoolSize;
+  private final CompressionCodec compressionCodec;
 
   @Deprecated // Use the builder instead
   public HttpClientConfig(
@@ -48,7 +86,15 @@ public class HttpClientConfig
       SSLContext sslContext
   )
   {
-    this(numConnections, sslContext, Duration.ZERO, null, DEFAULT_BOSS_COUNT, DEFAULT_WORKER_COUNT);
+    this(
+        numConnections,
+        sslContext,
+        Duration.ZERO,
+        null,
+        DEFAULT_BOSS_COUNT,
+        DEFAULT_WORKER_COUNT,
+        DEFAULT_COMPRESSION_CODEC
+    );
   }
 
   @Deprecated // Use the builder instead
@@ -58,7 +104,15 @@ public class HttpClientConfig
       Duration readTimeout
   )
   {
-    this(numConnections, sslContext, readTimeout, null, DEFAULT_BOSS_COUNT, DEFAULT_WORKER_COUNT);
+    this(
+        numConnections,
+        sslContext,
+        readTimeout,
+        null,
+        DEFAULT_BOSS_COUNT,
+        DEFAULT_WORKER_COUNT,
+        DEFAULT_COMPRESSION_CODEC
+    );
   }
 
   @Deprecated // Use the builder instead
@@ -69,7 +123,15 @@ public class HttpClientConfig
       Duration sslHandshakeTimeout
   )
   {
-    this(numConnections, sslContext, readTimeout, sslHandshakeTimeout, DEFAULT_BOSS_COUNT, DEFAULT_WORKER_COUNT);
+    this(
+        numConnections,
+        sslContext,
+        readTimeout,
+        sslHandshakeTimeout,
+        DEFAULT_BOSS_COUNT,
+        DEFAULT_WORKER_COUNT,
+        DEFAULT_COMPRESSION_CODEC
+    );
   }
 
   private HttpClientConfig(
@@ -78,7 +140,8 @@ public class HttpClientConfig
       Duration readTimeout,
       Duration sslHandshakeTimeout,
       int bossPoolSize,
-      int workerPoolSize
+      int workerPoolSize,
+      CompressionCodec compressionCodec
   )
   {
     this.numConnections = numConnections;
@@ -87,6 +150,7 @@ public class HttpClientConfig
     this.sslHandshakeTimeout = sslHandshakeTimeout;
     this.bossPoolSize = bossPoolSize;
     this.workerPoolSize = workerPoolSize;
+    this.compressionCodec = compressionCodec;
   }
 
   public int getNumConnections()
@@ -119,6 +183,11 @@ public class HttpClientConfig
     return workerPoolSize;
   }
 
+  public CompressionCodec getCompressionCodec()
+  {
+    return compressionCodec;
+  }
+
   public static class Builder
   {
     private int numConnections = 1;
@@ -127,6 +196,7 @@ public class HttpClientConfig
     private Duration sslHandshakeTimeout = null;
     private int bossCount = DEFAULT_BOSS_COUNT;
     private int workerCount = DEFAULT_WORKER_COUNT;
+    private CompressionCodec compressionCodec = DEFAULT_COMPRESSION_CODEC;
 
     private Builder() {}
 
@@ -172,9 +242,23 @@ public class HttpClientConfig
       return this;
     }
 
+    public Builder withCompressionCodec(CompressionCodec compressionCodec)
+    {
+      this.compressionCodec = compressionCodec;
+      return this;
+    }
+
     public HttpClientConfig build()
     {
-      return new HttpClientConfig(numConnections, sslContext, readTimeout, sslHandshakeTimeout, bossCount, workerCount);
+      return new HttpClientConfig(
+          numConnections,
+          sslContext,
+          readTimeout,
+          sslHandshakeTimeout,
+          bossCount,
+          workerCount,
+          compressionCodec
+      );
     }
   }
 }

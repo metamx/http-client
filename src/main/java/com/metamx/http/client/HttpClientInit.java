@@ -92,8 +92,11 @@ public class HttpClientInit
                       config.getSslHandshakeTimeout() == null ? -1 : config.getSslHandshakeTimeout().getMillis()
                   ),
                   new ResourcePoolConfig(config.getNumConnections())
-              )
-          ).withTimer(timer).withReadTimeout(config.getReadTimeout())
+              ),
+              config.getReadTimeout(),
+              config.getCompressionCodec(),
+              timer
+          )
       );
     }
     catch (Exception e) {

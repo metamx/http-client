@@ -66,23 +66,26 @@ public class NettyHttpClient extends AbstractHttpClient
 
   private final Timer timer;
   private final ResourcePool<String, ChannelFuture> pool;
+  private final HttpClientConfig.CompressionCodec compressionCodec;
   private final Duration defaultReadTimeout;
 
   public NettyHttpClient(
       ResourcePool<String, ChannelFuture> pool
   )
   {
-    this(pool, null, null);
+    this(pool, null, HttpClientConfig.DEFAULT_COMPRESSION_CODEC, null);
   }
 
-  private NettyHttpClient(
+  NettyHttpClient(
       ResourcePool<String, ChannelFuture> pool,
       Duration defaultReadTimeout,
+      HttpClientConfig.CompressionCodec compressionCodec,
       Timer timer
   )
   {
     this.pool = Preconditions.checkNotNull(pool, "pool");
     this.defaultReadTimeout = defaultReadTimeout;
+    this.compressionCodec = Preconditions.checkNotNull(compressionCodec);
     this.timer = timer;
 
     if (defaultReadTimeout != null && defaultReadTimeout.getMillis() > 0) {
@@ -103,12 +106,12 @@ public class NettyHttpClient extends AbstractHttpClient
 
   public HttpClient withReadTimeout(Duration readTimeout)
   {
-    return new NettyHttpClient(pool, readTimeout, timer);
+    return new NettyHttpClient(pool, readTimeout, compressionCodec, timer);
   }
 
   public NettyHttpClient withTimer(Timer timer)
   {
-    return new NettyHttpClient(pool, defaultReadTimeout, timer);
+    return new NettyHttpClient(pool, defaultReadTimeout, compressionCodec, timer);
   }
 
   @Override
@@ -155,7 +158,10 @@ public class NettyHttpClient extends AbstractHttpClient
       httpRequest.headers().add(HttpHeaders.Names.HOST, getHost(url));
     }
 
-    httpRequest.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
+    // If Accept-Encoding is set in the Request, use that. Otherwise use the default from "compressionCodec".
+    if (!headers.containsKey(HttpHeaders.Names.ACCEPT_ENCODING)) {
+      httpRequest.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, compressionCodec.getEncodingString());
+    }
 
     for (Map.Entry<String, Collection<String>> entry : headers.asMap().entrySet()) {
       String key = entry.getKey();

@@ -47,6 +47,7 @@ import java.net.URL;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Tests with servers that are at least moderately well-behaving.
@@ -93,6 +94,64 @@ public class FriendlyServersTest
 
       Assert.assertEquals(200, response.getStatus().getCode());
       Assert.assertEquals("hello!", response.getContent());
+    }
+    finally {
+      exec.shutdownNow();
+      serverSocket.close();
+      lifecycle.stop();
+    }
+  }
+
+  @Test
+  public void testCompressionCodecConfig() throws Exception
+  {
+    final ExecutorService exec = Executors.newSingleThreadExecutor();
+    final ServerSocket serverSocket = new ServerSocket(0);
+    final AtomicBoolean foundAcceptEncoding = new AtomicBoolean();
+    exec.submit(
+        new Runnable()
+        {
+          @Override
+          public void run()
+          {
+            while (!Thread.currentThread().isInterrupted()) {
+              try (
+                  Socket clientSocket = serverSocket.accept();
+                  BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                  OutputStream out = clientSocket.getOutputStream()
+              ) {
+                // Read headers
+                String header;
+                while (!(header = in.readLine()).equals("")) {
+                  if (header.equals("Accept-Encoding: identity")) {
+                    foundAcceptEncoding.set(true);
+                  }
+                }
+                out.write("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nhello!".getBytes(Charsets.UTF_8));
+              }
+              catch (Exception e) {
+                // Suppress
+              }
+            }
+          }
+        }
+    );
+
+    final Lifecycle lifecycle = new Lifecycle();
+    try {
+      final HttpClientConfig config = HttpClientConfig.builder()
+                                                      .withCompressionCodec(HttpClientConfig.CompressionCodec.IDENTITY)
+                                                      .build();
+      final HttpClient client = HttpClientInit.createClient(config, lifecycle);
+      final StatusResponseHolder response = client
+          .go(
+              new Request(HttpMethod.GET, new URL(String.format("http://localhost:%d/", serverSocket.getLocalPort()))),
+              new StatusResponseHandler(Charsets.UTF_8)
+          ).get();
+
+      Assert.assertEquals(200, response.getStatus().getCode());
+      Assert.assertEquals("hello!", response.getContent());
+      Assert.assertTrue(foundAcceptEncoding.get());
     }
     finally {
       exec.shutdownNow();
