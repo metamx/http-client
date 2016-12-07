@@ -48,6 +48,14 @@ public class HttpClientConfig
       }
     };
 
+    /**
+     * Get the header-ified name of this encoding, which should go in "Accept-Encoding" and
+     * "Content-Encoding" headers. This is not just the lowercasing of the enum name, since
+     * we may one day support x- encodings like LZ4, which would likely be an enum named
+     * "LZ4" that has an encoding string like "x-lz4".
+     *
+     * @return encoding name
+     */
     public abstract String getEncodingString();
   }
 
