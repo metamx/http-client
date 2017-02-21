@@ -48,12 +48,15 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelDownstreamHandler;
+import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelException;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
+import org.jboss.netty.channel.ChannelUpstreamHandler;
 import org.jboss.netty.channel.DefaultChannelPipeline;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
@@ -309,6 +312,9 @@ public class FriendlyServersTest
     sslEngine.setEnableSessionCreation(true);
 
     final SslHandler sslHandler = new SslHandler(sslEngine);
+    sslHandler.setIssueHandshake(true);
+    sslHandler.setCloseOnSSLException(true);
+//    sslHandler.setEnableRenegotiation(false);
 
     ServerBootstrap bootstrap = new ServerBootstrap(
         new NioServerSocketChannelFactory(
@@ -319,6 +325,7 @@ public class FriendlyServersTest
     // Enable TCP_NODELAY to handle pipelined requests without latency.
     bootstrap.setOption("child.tcpNoDelay", true);
 
+
     bootstrap.setPipelineFactory(new ChannelPipelineFactory()
     {
 
@@ -326,6 +333,7 @@ public class FriendlyServersTest
       public ChannelPipeline getPipeline() throws Exception
       {
         ChannelPipeline pipeline = new DefaultChannelPipeline();
+        pipeline.addLast("first", new LoggingHandler());
         pipeline.addLast("ssl", sslHandler);
         pipeline.addLast("decoder", new HttpRequestDecoder());
         pipeline.addLast("encoder", new HttpResponseEncoder());
@@ -349,6 +357,8 @@ public class FriendlyServersTest
       final HttpClient skepticalClient = HttpClientInit.createClient(skepticalConfig, lifecycle);
 
       // Correct name ("localhost")
+/*
+      System.out.println("Correct name (localhost)");
       {
         final HttpResponseStatus status = trustingClient
             .go(
@@ -357,8 +367,10 @@ public class FriendlyServersTest
             ).get().getStatus();
         Assert.assertEquals(200, status.getCode());
       }
+*/
 
       // Incorrect name ("127.0.0.1")
+      System.out.println("Incorrect name (127.0.0.1)");
       {
         final ListenableFuture<StatusResponseHolder> response1 = trustingClient
             .go(
@@ -378,8 +390,10 @@ public class FriendlyServersTest
         Assert.assertTrue("Expected error message", ea.getCause().getMessage().matches(".*Failed to handshake.*"));
       }
 
+/*
       {
         // Untrusting client
+        System.out.println("Untrusting client");
         final ListenableFuture<StatusResponseHolder> response2 = skepticalClient
             .go(
                 new Request(
@@ -401,6 +415,7 @@ public class FriendlyServersTest
             eb.getCause().getCause() instanceof SSLHandshakeException
         );
       }
+*/
     }
     finally {
       lifecycle.stop();
@@ -452,11 +467,30 @@ public class FriendlyServersTest
       future.addListener(ChannelFutureListener.CLOSE);
     }
 
+/*
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
     {
       e.getCause().printStackTrace();
       e.getChannel().close();
+      ctx.sendDownstream(e);
+    }
+*/
+  }
+
+  public class LoggingHandler implements ChannelUpstreamHandler, ChannelDownstreamHandler {
+    @Override
+    public void handleDownstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception
+    {
+      System.out.println("Outgoing event: " + e);
+      ctx.sendDownstream(e);
+    }
+
+    @Override
+    public void handleUpstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception
+    {
+      System.out.println("Incoming event: " + e);
+      ctx.sendUpstream(e);
     }
   }
 }

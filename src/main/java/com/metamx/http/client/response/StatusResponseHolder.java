@@ -16,7 +16,7 @@
 
 package com.metamx.http.client.response;
 
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpResponseStatus;
 
 /**
  */

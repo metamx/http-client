@@ -19,11 +19,9 @@ package com.metamx.http.client.response;
 import com.google.common.base.Throwables;
 import com.google.common.io.ByteSource;
 import com.metamx.common.logger.Logger;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBufferInputStream;
-import org.jboss.netty.handler.codec.http.HttpChunk;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
@@ -52,17 +50,17 @@ public class SequenceInputStreamResponseHandler implements HttpResponseHandler<I
   private final AtomicBoolean done = new AtomicBoolean(false);
 
   @Override
-  public ClientResponse<InputStream> handleResponse(HttpResponse response)
+  public ClientResponse<InputStream> handleResponse(FullHttpResponse response)
   {
     try {
-      queue.put(new ChannelBufferInputStream(response.getContent()));
+      queue.put(new ByteBufInputStream(response.content()));
     }
     catch (InterruptedException e) {
       log.error(e, "Queue appending interrupted");
       Thread.currentThread().interrupt();
       throw Throwables.propagate(e);
     }
-    byteCount.addAndGet(response.getContent().readableBytes());
+    byteCount.addAndGet(response.content().readableBytes());
     return ClientResponse.<InputStream>finished(
         new SequenceInputStream(
             new Enumeration<InputStream>()
@@ -96,14 +94,12 @@ public class SequenceInputStreamResponseHandler implements HttpResponseHandler<I
 
   @Override
   public ClientResponse<InputStream> handleChunk(
-      ClientResponse<InputStream> clientResponse, HttpChunk chunk
+      ClientResponse<InputStream> clientResponse, HttpContent chunk
   )
   {
-    final ChannelBuffer channelBuffer = chunk.getContent();
-    final int bytes = channelBuffer.readableBytes();
-    if (bytes > 0) {
+    if (chunk.content().hasArray()) {
       try {
-        queue.put(new ChannelBufferInputStream(channelBuffer));
+        queue.put(new ByteBufInputStream(chunk.content()));
         // Queue.size() can be expensive in some implementations, but LinkedBlockingQueue.size is just an AtomicLong
         log.debug("Added stream. Queue length %d", queue.size());
       }
@@ -112,7 +108,7 @@ public class SequenceInputStreamResponseHandler implements HttpResponseHandler<I
         Thread.currentThread().interrupt();
         throw Throwables.propagate(e);
       }
-      byteCount.addAndGet(bytes);
+      byteCount.addAndGet(chunk.content().array().length);
     } else {
       log.debug("Skipping zero length chunk");
     }

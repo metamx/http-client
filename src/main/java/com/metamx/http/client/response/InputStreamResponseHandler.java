@@ -16,12 +16,9 @@
 
 package com.metamx.http.client.response;
 
-import com.google.common.base.Throwables;
 import com.metamx.http.client.io.AppendableByteArrayInputStream;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.handler.codec.http.HttpChunk;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
 import java.io.InputStream;
 
 /**
@@ -29,19 +26,19 @@ import java.io.InputStream;
 public class InputStreamResponseHandler implements HttpResponseHandler<AppendableByteArrayInputStream, InputStream>
 {
   @Override
-  public ClientResponse<AppendableByteArrayInputStream> handleResponse(HttpResponse response)
+  public ClientResponse<AppendableByteArrayInputStream> handleResponse(FullHttpResponse response)
   {
     AppendableByteArrayInputStream in = new AppendableByteArrayInputStream();
-    in.add(getContentBytes(response.getContent()));
+    in.add(response.content().array());
     return ClientResponse.finished(in);
   }
 
   @Override
   public ClientResponse<AppendableByteArrayInputStream> handleChunk(
-      ClientResponse<AppendableByteArrayInputStream> clientResponse, HttpChunk chunk
+      ClientResponse<AppendableByteArrayInputStream> clientResponse, HttpContent chunk
   )
   {
-    clientResponse.getObj().add(getContentBytes(chunk.getContent()));
+    clientResponse.getObj().add(chunk.content().array());
     return clientResponse;
   }
 
@@ -61,12 +58,5 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
   {
     final AppendableByteArrayInputStream obj = clientResponse.getObj();
     obj.exceptionCaught(e);
-  }
-
-  private byte[] getContentBytes(ChannelBuffer content)
-  {
-    byte[] contentBytes = new byte[content.readableBytes()];
-    content.readBytes(contentBytes);
-    return contentBytes;
   }
 }

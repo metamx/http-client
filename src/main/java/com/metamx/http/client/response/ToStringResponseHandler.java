@@ -16,9 +16,8 @@
 
 package com.metamx.http.client.response;
 
-import org.jboss.netty.handler.codec.http.HttpChunk;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
 import java.nio.charset.Charset;
 
 /**
@@ -33,15 +32,15 @@ public class ToStringResponseHandler implements HttpResponseHandler<StringBuilde
   }
 
   @Override
-  public ClientResponse<StringBuilder> handleResponse(HttpResponse response)
+  public ClientResponse<StringBuilder> handleResponse(FullHttpResponse response)
   {
-    return ClientResponse.unfinished(new StringBuilder(response.getContent().toString(charset)));
+    return ClientResponse.unfinished(new StringBuilder(response.content().toString(charset)));
   }
 
   @Override
   public ClientResponse<StringBuilder> handleChunk(
       ClientResponse<StringBuilder> response,
-      HttpChunk chunk
+      HttpContent chunk
   )
   {
     final StringBuilder builder = response.getObj();
@@ -49,7 +48,7 @@ public class ToStringResponseHandler implements HttpResponseHandler<StringBuilde
       return ClientResponse.finished(null);
     }
 
-    builder.append(chunk.getContent().toString(charset));
+    builder.append(chunk.content().toString(charset));
     return response;
   }
 
