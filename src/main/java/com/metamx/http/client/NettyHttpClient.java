@@ -280,7 +280,7 @@ public class NettyHttpClient extends AbstractHttpClient
         }
     );
 
-    channel.write(httpRequest).addListener(
+    channel.writeAndFlush(httpRequest).addListener(
         new ChannelFutureListener()
         {
           @Override
