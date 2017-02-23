@@ -44,7 +44,6 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AsciiString;
-import io.netty.util.Timer;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
@@ -60,7 +59,6 @@ public class NettyHttpClient extends AbstractHttpClient
   private static final String READ_TIMEOUT_HANDLER_NAME = "read-timeout";
   private static final String LAST_HANDLER_NAME = "last-handler";
 
-  private final Timer timer;
   private final ResourcePool<String, ChannelFuture> pool;
   private final HttpClientConfig.CompressionCodec compressionCodec;
   private final Duration defaultReadTimeout;
@@ -69,24 +67,18 @@ public class NettyHttpClient extends AbstractHttpClient
       ResourcePool<String, ChannelFuture> pool
   )
   {
-    this(pool, null, HttpClientConfig.DEFAULT_COMPRESSION_CODEC, null);
+    this(pool, null, HttpClientConfig.DEFAULT_COMPRESSION_CODEC);
   }
 
   NettyHttpClient(
       ResourcePool<String, ChannelFuture> pool,
       Duration defaultReadTimeout,
-      HttpClientConfig.CompressionCodec compressionCodec,
-      Timer timer
+      HttpClientConfig.CompressionCodec compressionCodec
   )
   {
     this.pool = Preconditions.checkNotNull(pool, "pool");
     this.defaultReadTimeout = defaultReadTimeout;
     this.compressionCodec = Preconditions.checkNotNull(compressionCodec);
-    this.timer = timer;
-
-    if (defaultReadTimeout != null && defaultReadTimeout.getMillis() > 0) {
-      Preconditions.checkNotNull(timer, "timer");
-    }
   }
 
   @LifecycleStart
@@ -102,12 +94,7 @@ public class NettyHttpClient extends AbstractHttpClient
 
   public HttpClient withReadTimeout(Duration readTimeout)
   {
-    return new NettyHttpClient(pool, readTimeout, compressionCodec, timer);
-  }
-
-  public NettyHttpClient withTimer(Timer timer)
-  {
-    return new NettyHttpClient(pool, defaultReadTimeout, compressionCodec, timer);
+    return new NettyHttpClient(pool, readTimeout, compressionCodec);
   }
 
   @Override
@@ -329,7 +316,7 @@ public class NettyHttpClient extends AbstractHttpClient
       timeout = 0;
     }
 
-    if (timeout > 0 && timer == null) {
+    if (timeout > 0) {
       log.warn("Cannot time out requests without a timer! Disabling timeout for this request.");
       return 0;
     } else {

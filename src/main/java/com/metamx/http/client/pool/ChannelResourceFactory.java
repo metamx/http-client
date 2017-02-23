@@ -18,23 +18,22 @@ package com.metamx.http.client.pool;
 
 import com.google.common.base.Preconditions;
 import com.metamx.common.logger.Logger;
-import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelException;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.handler.ssl.ImmediateExecutor;
-import org.jboss.netty.handler.ssl.SslHandler;
-import org.jboss.netty.util.Timer;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelException;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
+import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 
 /**
  */
@@ -44,26 +43,19 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
 
   private static final long DEFAULT_SSL_HANDSHAKE_TIMEOUT = 10000L; /* 10 seconds */
 
-  private final ClientBootstrap bootstrap;
+  private final Bootstrap bootstrap;
   private final SSLContext sslContext;
-  private final Timer timer;
   private final long sslHandshakeTimeout;
 
   public ChannelResourceFactory(
-      ClientBootstrap bootstrap,
+      Bootstrap bootstrap,
       SSLContext sslContext,
-      Timer timer,
       long sslHandshakeTimeout
   )
   {
     this.bootstrap = Preconditions.checkNotNull(bootstrap, "bootstrap");
     this.sslContext = sslContext;
-    this.timer = timer;
     this.sslHandshakeTimeout = sslHandshakeTimeout >= 0 ? sslHandshakeTimeout : DEFAULT_SSL_HANDSHAKE_TIMEOUT;
-
-    if (sslContext != null) {
-      Preconditions.checkNotNull(timer, "timer is required when sslContext is present");
-    }
   }
 
   @Override
@@ -93,21 +85,13 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
       sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
       sslEngine.setSSLParameters(sslParameters);
       sslEngine.setUseClientMode(true);
-      final SslHandler sslHandler = new SslHandler(
-          sslEngine,
-          SslHandler.getDefaultBufferPool(),
-          false,
-          timer,
-          sslHandshakeTimeout
-      );
+      final SslHandler sslHandler = new SslHandler(sslEngine);
+      sslHandler.setHandshakeTimeoutMillis(sslHandshakeTimeout);
 
-      // https://github.com/netty/netty/issues/160
-      sslHandler.setCloseOnSSLException(true);
-
-      final ChannelPipeline pipeline = connectFuture.getChannel().getPipeline();
+      final ChannelPipeline pipeline = connectFuture.channel().pipeline();
       pipeline.addFirst("ssl", sslHandler);
 
-      final ChannelFuture handshakeFuture = Channels.future(connectFuture.getChannel());
+      final ChannelPromise handshakeFuture = connectFuture.channel().newPromise();
       connectFuture.addListener(
           new ChannelFutureListener()
           {
@@ -115,11 +99,11 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
             public void operationComplete(ChannelFuture f) throws Exception
             {
               if (f.isSuccess()) {
-                sslHandler.handshake().addListener(
-                    new ChannelFutureListener()
+                sslHandler.handshakeFuture().addListener(
+                    new GenericFutureListener<Future<Channel>>()
                     {
                       @Override
-                      public void operationComplete(ChannelFuture f2) throws Exception
+                      public void operationComplete(Future<Channel> f2) throws Exception
                       {
                         if (f2.isSuccess()) {
                           handshakeFuture.setSuccess();
@@ -127,7 +111,7 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
                           handshakeFuture.setFailure(
                               new ChannelException(
                                   String.format("Failed to handshake with host[%s]", hostname),
-                                  f2.getCause()
+                                  f2.cause()
                               )
                           );
                         }
@@ -138,7 +122,7 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
                 handshakeFuture.setFailure(
                     new ChannelException(
                         String.format("Failed to connect to host[%s]", hostname),
-                        f.getCause()
+                        f.cause()
                     )
                 );
               }
@@ -157,23 +141,22 @@ public class ChannelResourceFactory implements ResourceFactory<String, ChannelFu
   @Override
   public boolean isGood(ChannelFuture resource)
   {
-    Channel channel = resource.awaitUninterruptibly().getChannel();
+    Channel channel = resource.awaitUninterruptibly().channel();
 
     boolean isSuccess = resource.isSuccess();
-    boolean isConnected = channel.isConnected();
     boolean isOpen = channel.isOpen();
 
     if (log.isTraceEnabled()) {
-      log.trace("isGood = isSucess[%s] && isConnected[%s] && isOpen[%s]", isSuccess, isConnected, isOpen);
+      log.trace("isGood = isSucess[%s] && isOpen[%s]", isSuccess, isOpen);
     }
 
-    return isSuccess && isConnected && isOpen;
+    return isSuccess && isOpen;
   }
 
   @Override
   public void close(ChannelFuture resource)
   {
     log.trace("Closing");
-    resource.awaitUninterruptibly().getChannel().close();
+    resource.awaitUninterruptibly().channel().close();
   }
 }

@@ -24,19 +24,12 @@ import com.metamx.http.client.netty.HttpClientPipelineFactory;
 import com.metamx.http.client.pool.ChannelResourceFactory;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
-import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.channel.socket.nio.NioClientBossPool;
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
-import org.jboss.netty.channel.socket.nio.NioWorkerPool;
-import org.jboss.netty.logging.InternalLoggerFactory;
-import org.jboss.netty.logging.Log4JLoggerFactory;
-import org.jboss.netty.util.HashedWheelTimer;
-import org.jboss.netty.util.ThreadNameDeterminer;
-import org.jboss.netty.util.Timer;
-import org.joda.time.Duration;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Log4JLoggerFactory;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -46,7 +39,9 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import org.joda.time.Duration;
 
 /**
  */
@@ -55,47 +50,18 @@ public class HttpClientInit
   public static HttpClient createClient(HttpClientConfig config, Lifecycle lifecycle)
   {
     try {
-      // We need to use the full constructor in order to set a ThreadNameDeterminer. The other parameters are taken
-      // from the defaults in HashedWheelTimer's other constructors.
-      final HashedWheelTimer timer = new HashedWheelTimer(
-          new ThreadFactoryBuilder().setDaemon(true)
-                                    .setNameFormat("HttpClient-Timer-%s")
-                                    .build(),
-          ThreadNameDeterminer.CURRENT,
-          100,
-          TimeUnit.MILLISECONDS,
-          512
-      );
-      lifecycle.addMaybeStartHandler(
-          new Lifecycle.Handler()
-          {
-            @Override
-            public void start() throws Exception
-            {
-              timer.start();
-            }
-
-            @Override
-            public void stop()
-            {
-              timer.stop();
-            }
-          }
-      );
       return lifecycle.addMaybeStartManagedInstance(
           new NettyHttpClient(
               new ResourcePool<>(
                   new ChannelResourceFactory(
-                      createBootstrap(lifecycle, timer, config.getBossPoolSize(), config.getWorkerPoolSize()),
+                      createBootstrap(lifecycle, config.getBossPoolSize(), config.getWorkerPoolSize()),
                       config.getSslContext(),
-                      timer,
                       config.getSslHandshakeTimeout() == null ? -1 : config.getSslHandshakeTimeout().getMillis()
                   ),
                   new ResourcePoolConfig(config.getNumConnections())
               ),
               config.getReadTimeout(),
-              config.getCompressionCodec(),
-              timer
+              config.getCompressionCodec()
           )
       );
     }
@@ -114,17 +80,10 @@ public class HttpClientInit
   }
 
   @Deprecated // use createClient directly
-  public static ClientBootstrap createBootstrap(Lifecycle lifecycle, Timer timer)
+  public static Bootstrap createBootstrap(Lifecycle lifecycle)
   {
     final HttpClientConfig defaultConfig = HttpClientConfig.builder().build();
-    return createBootstrap(lifecycle, timer, defaultConfig.getBossPoolSize(), defaultConfig.getWorkerPoolSize());
-  }
-
-  @Deprecated // use createClient directly
-  public static ClientBootstrap createBootstrap(Lifecycle lifecycle)
-  {
-    final Timer timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build());
-    return createBootstrap(lifecycle, timer);
+    return createBootstrap(lifecycle, defaultConfig.getBossPoolSize(), defaultConfig.getWorkerPoolSize());
   }
 
   public static SSLContext sslContextWithTrustedKeyStore(final String keyStorePath, final String keyStorePassword)
@@ -167,37 +126,25 @@ public class HttpClientInit
     }
   }
 
-  private static ClientBootstrap createBootstrap(Lifecycle lifecycle, Timer timer, int bossPoolSize, int workerPoolSize)
+  private static Bootstrap createBootstrap(Lifecycle lifecycle, int bossPoolSize, int workerPoolSize)
   {
-    final NioClientBossPool bossPool = new NioClientBossPool(
-        Executors.newCachedThreadPool(
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("HttpClient-Netty-Boss-%s")
-                .build()
-        ),
+    final NioEventLoopGroup group = new NioEventLoopGroup(
         bossPoolSize,
-        timer,
-        ThreadNameDeterminer.CURRENT
-    );
-
-    final NioWorkerPool workerPool = new NioWorkerPool(
         Executors.newCachedThreadPool(
             new ThreadFactoryBuilder()
                 .setDaemon(true)
-                .setNameFormat("HttpClient-Netty-Worker-%s")
+                .setNameFormat("HttpClient-Netty-Client-%s")
                 .build()
-        ),
-        workerPoolSize,
-        ThreadNameDeterminer.CURRENT
+        )
     );
 
-    final ClientBootstrap bootstrap = new ClientBootstrap(new NioClientSocketChannelFactory(bossPool, workerPool));
+    final Bootstrap bootstrap = new Bootstrap()
+        .group(group)
+        .channel(NioSocketChannel.class)
+        .option(ChannelOption.SO_KEEPALIVE, true)
+        .handler(new HttpClientPipelineFactory());
 
-    bootstrap.setOption("keepAlive", true);
-    bootstrap.setPipelineFactory(new HttpClientPipelineFactory());
-
-    InternalLoggerFactory.setDefaultFactory(new Log4JLoggerFactory());
+    InternalLoggerFactory.setDefaultFactory(Log4JLoggerFactory.INSTANCE);
 
     try {
       lifecycle.addMaybeStartHandler(
@@ -211,7 +158,7 @@ public class HttpClientInit
             @Override
             public void stop()
             {
-              bootstrap.releaseExternalResources();
+              /*TODO: release bootstrap resources*/
             }
           }
       );
