@@ -61,7 +61,6 @@ public class ResourcePool<K, V> implements Closeable
 
   public ResourceContainer<V> take(final K key)
   {
-    System.out.println("Taking resource from pool for key " + key);
     if (closed.get()) {
       log.error(String.format("take(%s) called even though I'm closed.", key));
       return null;
@@ -75,7 +74,6 @@ public class ResourcePool<K, V> implements Closeable
       throw Throwables.propagate(e);
     }
     final V value = holder.get();
-    System.out.println("Finished taking resource from pool for key " + key);
 
     return new ResourceContainer<V>()
     {

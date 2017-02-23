@@ -184,6 +184,9 @@ public class NettyHttpClient extends AbstractHttpClient
                   log.debug("[%s] Got response: %s", requestDesc, httpResponse.status());
                 }
 
+                if (httpResponse.decoderResult().isFailure()) {
+                  throw (Exception) httpResponse.decoderResult().cause();
+                }
                 response = handler.handleResponse(httpResponse);
                 if (response.isFinished()) {
                   retVal.set((Final) response.getObj());
@@ -194,7 +197,7 @@ public class NettyHttpClient extends AbstractHttpClient
               log.warn(ex, "[%s] Exception thrown while processing message, closing channel.", requestDesc);
 
               if (!retVal.isDone()) {
-                retVal.set(null);
+                retVal.setException(ex);
               }
               channel.close();
               channelResourceContainer.returnResource();
