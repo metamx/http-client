@@ -315,13 +315,7 @@ public class NettyHttpClient extends AbstractHttpClient
     } else {
       timeout = 0;
     }
-
-    if (timeout > 0) {
-      log.warn("Cannot time out requests without a timer! Disabling timeout for this request.");
-      return 0;
-    } else {
-      return timeout;
-    }
+    return timeout;
   }
 
   private String getHost(URL url)
