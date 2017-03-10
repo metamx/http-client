@@ -19,9 +19,11 @@ package com.metamx.http.client.response;
 import com.google.common.base.Throwables;
 import com.google.common.io.ByteSource;
 import com.metamx.common.logger.Logger;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
@@ -50,17 +52,18 @@ public class SequenceInputStreamResponseHandler implements HttpResponseHandler<I
   private final AtomicBoolean done = new AtomicBoolean(false);
 
   @Override
-  public ClientResponse<InputStream> handleResponse(FullHttpResponse response)
+  public ClientResponse<InputStream> handleResponse(HttpResponse response)
   {
+    ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
     try {
-      queue.put(new ByteBufInputStream(response.content()));
+      queue.put(new ByteBufInputStream(content));
     }
     catch (InterruptedException e) {
       log.error(e, "Queue appending interrupted");
       Thread.currentThread().interrupt();
       throw Throwables.propagate(e);
     }
-    byteCount.addAndGet(response.content().readableBytes());
+    byteCount.addAndGet(content.readableBytes());
     return ClientResponse.<InputStream>finished(
         new SequenceInputStream(
             new Enumeration<InputStream>()

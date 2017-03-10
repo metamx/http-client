@@ -17,8 +17,10 @@
 package com.metamx.http.client.response;
 
 import com.metamx.http.client.io.AppendableByteArrayInputStream;
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 import java.io.InputStream;
 
 /**
@@ -26,10 +28,11 @@ import java.io.InputStream;
 public class InputStreamResponseHandler implements HttpResponseHandler<AppendableByteArrayInputStream, InputStream>
 {
   @Override
-  public ClientResponse<AppendableByteArrayInputStream> handleResponse(FullHttpResponse response)
+  public ClientResponse<AppendableByteArrayInputStream> handleResponse(HttpResponse response)
   {
+    ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
     AppendableByteArrayInputStream in = new AppendableByteArrayInputStream();
-    in.add(response.content().array());
+    in.add(content.array());
     return ClientResponse.finished(in);
   }
 

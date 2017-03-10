@@ -37,11 +37,13 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AsciiString;
 import java.net.URL;
@@ -163,8 +165,6 @@ public class NettyHttpClient extends AbstractHttpClient
           new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS)
       );
     }
-    channel.pipeline().addLast("aggregator", new HttpObjectAggregator(1048576));
-
     channel.pipeline().addLast(
         LAST_HANDLER_NAME,
         new SimpleChannelInboundHandler()
@@ -178,21 +178,45 @@ public class NettyHttpClient extends AbstractHttpClient
               log.debug("[%s] messageReceived: %s", requestDesc, o);
             }
             try {
-              if (o instanceof FullHttpResponse) {
-                FullHttpResponse httpResponse = (FullHttpResponse) o;
+              if (o instanceof HttpResponse) {
+                HttpResponse httpResponse = (HttpResponse) o;
                 if (log.isDebugEnabled()) {
                   log.debug("[%s] Got response: %s", requestDesc, httpResponse.status());
                 }
 
-                if (httpResponse.decoderResult().isFailure()) {
-                  throw (Exception) httpResponse.decoderResult().cause();
-                }
                 response = handler.handleResponse(httpResponse);
                 if (response.isFinished()) {
                   retVal.set((Final) response.getObj());
                 }
-                finishRequest();
-              }            }
+
+                if (!HttpUtil.isTransferEncodingChunked(httpResponse)) {
+                  finishRequest();
+                }
+              } else if (o instanceof HttpContent) {
+                HttpContent httpChunk = (HttpContent) o;
+                boolean isLast = httpChunk instanceof LastHttpContent;
+                if (log.isDebugEnabled()) {
+                  log.debug(
+                      "[%s] Got chunk: %sB, last=%s",
+                      requestDesc,
+                      httpChunk.content().readableBytes(),
+                      isLast
+                  );
+                }
+
+                if (isLast) {
+                  finishRequest();
+                } else {
+                  response = handler.handleChunk(response, httpChunk);
+                  if (response.isFinished() && !retVal.isDone()) {
+                    retVal.set((Final) response.getObj());
+                  }
+                }
+              } else {
+                throw new IllegalStateException(String.format("Unknown message type[%s]", o.getClass()));
+              }
+
+            }
             catch (Exception ex) {
               log.warn(ex, "[%s] Exception thrown while processing message, closing channel.", requestDesc);
 

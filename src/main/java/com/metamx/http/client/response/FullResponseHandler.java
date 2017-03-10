@@ -16,8 +16,10 @@
 
 package com.metamx.http.client.response;
 
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 import java.nio.charset.Charset;
 
 /**
@@ -32,13 +34,14 @@ public class FullResponseHandler implements HttpResponseHandler<FullResponseHold
   }
 
   @Override
-  public ClientResponse<FullResponseHolder> handleResponse(FullHttpResponse response)
+  public ClientResponse<FullResponseHolder> handleResponse(HttpResponse response)
   {
+    ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
     return ClientResponse.unfinished(
         new FullResponseHolder(
             response.status(),
             response,
-            new StringBuilder(response.content().toString(charset))
+            new StringBuilder(content.toString(charset))
         )
     );
   }

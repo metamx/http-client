@@ -16,8 +16,8 @@
 
 package com.metamx.http.client.response;
 
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 
 /**
  * A handler for an HTTP request.
@@ -44,7 +44,7 @@ public interface HttpResponseHandler<IntermediateType, FinalType>
    * @param response - response from Netty
    * @return
    */
-  public ClientResponse<IntermediateType> handleResponse(FullHttpResponse response);
+  public ClientResponse<IntermediateType> handleResponse(HttpResponse response);
   public ClientResponse<IntermediateType> handleChunk(ClientResponse<IntermediateType> clientResponse, HttpContent chunk);
   public ClientResponse<FinalType> done(ClientResponse<IntermediateType> clientResponse);
   public void exceptionCaught(ClientResponse<IntermediateType> clientResponse,Throwable e);
