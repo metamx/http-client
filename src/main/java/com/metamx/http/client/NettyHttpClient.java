@@ -65,9 +65,7 @@ public class NettyHttpClient extends AbstractHttpClient
   private final HttpClientConfig.CompressionCodec compressionCodec;
   private final Duration defaultReadTimeout;
 
-  public NettyHttpClient(
-      ResourcePool<String, ChannelFuture> pool
-  )
+  public NettyHttpClient(ResourcePool<String, ChannelFuture> pool)
   {
     this(pool, null, HttpClientConfig.DEFAULT_COMPRESSION_CODEC);
   }
@@ -160,10 +158,7 @@ public class NettyHttpClient extends AbstractHttpClient
     final SettableFuture<Final> retVal = SettableFuture.create();
 
     if (readTimeout > 0) {
-      channel.pipeline().addLast(
-          READ_TIMEOUT_HANDLER_NAME,
-          new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS)
-      );
+      channel.pipeline().addLast(READ_TIMEOUT_HANDLER_NAME, new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
     }
     channel.pipeline().addLast(
         LAST_HANDLER_NAME,
@@ -172,14 +167,14 @@ public class NettyHttpClient extends AbstractHttpClient
           private volatile ClientResponse<Intermediate> response = null;
 
           @Override
-          protected void channelRead0(ChannelHandlerContext channelHandlerContext, Object o) throws Exception
+          protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception
           {
             if (log.isDebugEnabled()) {
-              log.debug("[%s] messageReceived: %s", requestDesc, o);
+              log.debug("[%s] messageReceived: %s", requestDesc, msg);
             }
             try {
-              if (o instanceof HttpResponse) {
-                HttpResponse httpResponse = (HttpResponse) o;
+              if (msg instanceof HttpResponse) {
+                HttpResponse httpResponse = (HttpResponse) msg;
                 if (log.isDebugEnabled()) {
                   log.debug("[%s] Got response: %s", requestDesc, httpResponse.status());
                 }
@@ -188,12 +183,9 @@ public class NettyHttpClient extends AbstractHttpClient
                 if (response.isFinished()) {
                   retVal.set((Final) response.getObj());
                 }
-
-                if (!HttpUtil.isTransferEncodingChunked(httpResponse)) {
-                  finishRequest();
-                }
-              } else if (o instanceof HttpContent) {
-                HttpContent httpChunk = (HttpContent) o;
+              }
+              if (msg instanceof HttpContent) {
+                HttpContent httpChunk = (HttpContent) msg;
                 boolean isLast = httpChunk instanceof LastHttpContent;
                 if (log.isDebugEnabled()) {
                   log.debug(
@@ -203,29 +195,28 @@ public class NettyHttpClient extends AbstractHttpClient
                       isLast
                   );
                 }
-
+                response = handler.handleChunk(response, httpChunk);
+                if (response.isFinished() && !retVal.isDone()) {
+                  retVal.set((Final) response.getObj());
+                }
                 if (isLast) {
                   finishRequest();
-                } else {
-                  response = handler.handleChunk(response, httpChunk);
-                  if (response.isFinished() && !retVal.isDone()) {
-                    retVal.set((Final) response.getObj());
-                  }
+                  ctx.close();
                 }
-              } else {
-                throw new IllegalStateException(String.format("Unknown message type[%s]", o.getClass()));
+              }
+              if (!(msg instanceof HttpContent) && !(msg instanceof HttpResponse)) {
+                /*TODO Do we really need this?*/
+                throw new IllegalStateException(String.format("Unknown message type[%s]", msg.getClass()));
               }
 
             }
             catch (Exception ex) {
               log.warn(ex, "[%s] Exception thrown while processing message, closing channel.", requestDesc);
-
               if (!retVal.isDone()) {
                 retVal.setException(ex);
               }
               channel.close();
               channelResourceContainer.returnResource();
-
               throw ex;
             }
           }

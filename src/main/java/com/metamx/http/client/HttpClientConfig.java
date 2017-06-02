@@ -56,7 +56,7 @@ public class HttpClientConfig
      *
      * @return encoding name
      */
-    public abstract String getEncodingString();
+    public abstract String getEncodingString(); /*TODO use for Content-Encoding*/
   }
 
   public static final CompressionCodec DEFAULT_COMPRESSION_CODEC = CompressionCodec.GZIP;
