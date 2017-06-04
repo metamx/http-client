@@ -179,7 +179,7 @@ public class Request
   private String base64Encode(final String value)
   {
     return Base64
-        .encode(Unpooled.wrappedBuffer(value.getBytes(Charsets.UTF_8)), false) /*TODO: Unpooled, why?*/
+        .encode(Unpooled.wrappedBuffer(value.getBytes(Charsets.UTF_8)), false)
         .toString(Charsets.UTF_8);
   }
 }

@@ -143,7 +143,6 @@ public class HttpClientInit
             @Override
             public void stop()
             {
-              /*TODO: release bootstrap resources*/
             }
           }
       );

@@ -205,7 +205,6 @@ public class NettyHttpClient extends AbstractHttpClient
                 }
               }
               if (!(msg instanceof HttpContent) && !(msg instanceof HttpResponse)) {
-                /*TODO Do we really need this?*/
                 throw new IllegalStateException(String.format("Unknown message type[%s]", msg.getClass()));
               }
 
