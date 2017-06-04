@@ -41,16 +41,16 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AsciiString;
+import org.joda.time.Duration;
+
 import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.joda.time.Duration;
 
 /**
  */

@@ -305,16 +305,7 @@ public class JankyServersTest
               new StatusResponseHandler(Charsets.UTF_8)
           );
 
-      Throwable e = null;
-      try {
-        response.get();
-      }
-      catch (ExecutionException e1) {
-        e = e1.getCause();
-      }
-
-      Assert.assertTrue("IllegalArgumentException thrown by 'get'", e instanceof IllegalArgumentException);
-      Assert.assertTrue("Expected error message", e.getMessage().matches(".*invalid version format:.*"));
+      Assert.assertEquals(999, response.get().getStatus().code());
     }
     finally {
       lifecycle.stop();

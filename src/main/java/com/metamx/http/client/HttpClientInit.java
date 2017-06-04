@@ -103,22 +103,7 @@ public class HttpClientInit
 
       return sslContext;
     }
-    catch (CertificateException e) {
-      throw Throwables.propagate(e);
-    }
-    catch (NoSuchAlgorithmException e) {
-      throw Throwables.propagate(e);
-    }
-    catch (KeyStoreException e) {
-      throw Throwables.propagate(e);
-    }
-    catch (KeyManagementException e) {
-      throw Throwables.propagate(e);
-    }
-    catch (FileNotFoundException e) {
-      throw Throwables.propagate(e);
-    }
-    catch (IOException e) {
+    catch (CertificateException | NoSuchAlgorithmException | KeyStoreException | KeyManagementException | IOException e) {
       throw Throwables.propagate(e);
     }
     finally {
