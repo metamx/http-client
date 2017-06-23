@@ -30,8 +30,11 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Log4JLoggerFactory;
+import org.joda.time.Duration;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
@@ -39,9 +42,6 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.concurrent.Executors;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
-import org.joda.time.Duration;
 
 /**
  */

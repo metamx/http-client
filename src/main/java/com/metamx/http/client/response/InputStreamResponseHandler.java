@@ -32,7 +32,7 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
   {
     ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
     AppendableByteArrayInputStream in = new AppendableByteArrayInputStream();
-    in.add(content.array());
+    in.add(getBytes(content));
     return ClientResponse.finished(in);
   }
 
@@ -41,7 +41,7 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
       ClientResponse<AppendableByteArrayInputStream> clientResponse, HttpContent chunk
   )
   {
-    clientResponse.getObj().add(chunk.content().array());
+    clientResponse.getObj().add(getBytes(chunk.content()));
     return clientResponse;
   }
 
@@ -61,5 +61,13 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
   {
     final AppendableByteArrayInputStream obj = clientResponse.getObj();
     obj.exceptionCaught(e);
+  }
+
+  private byte[] getBytes(ByteBuf content)
+  {
+    byte[] bytes = new byte[content.readableBytes()];
+    int readerIndex = content.readerIndex();
+    content.getBytes(readerIndex, bytes);
+    return bytes;
   }
 }

@@ -100,7 +100,7 @@ public class SequenceInputStreamResponseHandler implements HttpResponseHandler<I
       ClientResponse<InputStream> clientResponse, HttpContent chunk
   )
   {
-    if (chunk.content().hasArray()) {
+    if (chunk.content().readableBytes() > 0) {
       try {
         queue.put(new ByteBufInputStream(chunk.content()));
         // Queue.size() can be expensive in some implementations, but LinkedBlockingQueue.size is just an AtomicLong
@@ -111,7 +111,7 @@ public class SequenceInputStreamResponseHandler implements HttpResponseHandler<I
         Thread.currentThread().interrupt();
         throw Throwables.propagate(e);
       }
-      byteCount.addAndGet(chunk.content().array().length);
+      byteCount.addAndGet(chunk.content().readableBytes());
     } else {
       log.debug("Skipping zero length chunk");
     }

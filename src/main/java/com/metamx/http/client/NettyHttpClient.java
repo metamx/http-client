@@ -131,11 +131,18 @@ public class NettyHttpClient extends AbstractHttpClient
     }
 
     final String urlFile = Strings.nullToEmpty(url.getFile());
-    String uri = urlFile.isEmpty() ? "/" : urlFile;
-    final DefaultFullHttpRequest httpRequest =
-        request.hasContent() ?
-        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri, request.getContent()) :
-        new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri);
+    String uri;
+    if (urlFile.isEmpty()) {
+      uri = "/";
+    } else {
+      uri = urlFile;
+    }
+    final DefaultFullHttpRequest httpRequest;
+    if (request.hasContent()) {
+      httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri, request.getContent());
+    } else {
+      httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri);
+    }
 
     if (!headers.containsKey(HttpHeaderNames.HOST)) {
       httpRequest.headers().add(HttpHeaderNames.HOST, getHost(url));
@@ -164,7 +171,7 @@ public class NettyHttpClient extends AbstractHttpClient
         LAST_HANDLER_NAME,
         new SimpleChannelInboundHandler()
         {
-          private volatile ClientResponse<Intermediate> response = null;
+          private ClientResponse<Intermediate> response = null;
 
           @Override
           protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception
@@ -196,12 +203,11 @@ public class NettyHttpClient extends AbstractHttpClient
                   );
                 }
                 response = handler.handleChunk(response, httpChunk);
-                if (response.isFinished() && !retVal.isDone()) {
+                if (response.isFinished()) {
                   retVal.set((Final) response.getObj());
                 }
                 if (isLast) {
                   finishRequest();
-                  ctx.close();
                 }
               }
               if (!(msg instanceof HttpContent) && !(msg instanceof HttpResponse)) {

@@ -16,10 +16,9 @@
 
 package com.metamx.http.client.response;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
+
 import java.nio.charset.Charset;
 
 /**
@@ -36,8 +35,13 @@ public class ToStringResponseHandler implements HttpResponseHandler<StringBuilde
   @Override
   public ClientResponse<StringBuilder> handleResponse(HttpResponse response)
   {
-    ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
-    return ClientResponse.unfinished(new StringBuilder(content.toString(charset)));
+    final StringBuilder builder;
+    if (response instanceof HttpContent) {
+      builder = new StringBuilder(((HttpContent) response).content().toString(charset));
+    } else {
+      builder = new StringBuilder();
+    }
+    return ClientResponse.unfinished(builder);
   }
 
   @Override
