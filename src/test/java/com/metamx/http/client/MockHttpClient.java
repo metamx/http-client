@@ -22,7 +22,7 @@ import com.metamx.http.client.pool.ResourceFactory;
 import com.metamx.http.client.pool.ResourcePool;
 import com.metamx.http.client.pool.ResourcePoolConfig;
 import com.metamx.http.client.response.HttpResponseHandler;
-import org.jboss.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFuture;
 import org.joda.time.Duration;
 
 /**

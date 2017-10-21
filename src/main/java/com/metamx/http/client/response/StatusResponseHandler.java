@@ -16,9 +16,10 @@
 
 package com.metamx.http.client.response;
 
-import org.jboss.netty.handler.codec.http.HttpChunk;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 import java.nio.charset.Charset;
 
 /**
@@ -35,10 +36,11 @@ public class StatusResponseHandler implements HttpResponseHandler<StatusResponse
   @Override
   public ClientResponse<StatusResponseHolder> handleResponse(HttpResponse response)
   {
+    ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
     return ClientResponse.unfinished(
         new StatusResponseHolder(
-            response.getStatus(),
-            new StringBuilder(response.getContent().toString(charset))
+            response.status(),
+            new StringBuilder(content.toString(charset))
         )
     );
   }
@@ -46,7 +48,7 @@ public class StatusResponseHandler implements HttpResponseHandler<StatusResponse
   @Override
   public ClientResponse<StatusResponseHolder> handleChunk(
       ClientResponse<StatusResponseHolder> response,
-      HttpChunk chunk
+      HttpContent chunk
   )
   {
     final StringBuilder builder = response.getObj().getBuilder();
@@ -55,7 +57,7 @@ public class StatusResponseHandler implements HttpResponseHandler<StatusResponse
       return ClientResponse.finished(null);
     }
 
-    builder.append(chunk.getContent().toString(charset));
+    builder.append(chunk.content().toString(charset));
     return response;
   }
 

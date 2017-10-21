@@ -16,12 +16,11 @@
 
 package com.metamx.http.client.response;
 
-import com.google.common.base.Throwables;
 import com.metamx.http.client.io.AppendableByteArrayInputStream;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.handler.codec.http.HttpChunk;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 import java.io.InputStream;
 
 /**
@@ -31,17 +30,18 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
   @Override
   public ClientResponse<AppendableByteArrayInputStream> handleResponse(HttpResponse response)
   {
+    ByteBuf content = response instanceof HttpContent ? ((HttpContent) response).content() : Unpooled.EMPTY_BUFFER;
     AppendableByteArrayInputStream in = new AppendableByteArrayInputStream();
-    in.add(getContentBytes(response.getContent()));
+    in.add(getBytes(content));
     return ClientResponse.finished(in);
   }
 
   @Override
   public ClientResponse<AppendableByteArrayInputStream> handleChunk(
-      ClientResponse<AppendableByteArrayInputStream> clientResponse, HttpChunk chunk
+      ClientResponse<AppendableByteArrayInputStream> clientResponse, HttpContent chunk
   )
   {
-    clientResponse.getObj().add(getContentBytes(chunk.getContent()));
+    clientResponse.getObj().add(getBytes(chunk.content()));
     return clientResponse;
   }
 
@@ -63,10 +63,11 @@ public class InputStreamResponseHandler implements HttpResponseHandler<Appendabl
     obj.exceptionCaught(e);
   }
 
-  private byte[] getContentBytes(ChannelBuffer content)
+  private byte[] getBytes(ByteBuf content)
   {
-    byte[] contentBytes = new byte[content.readableBytes()];
-    content.readBytes(contentBytes);
-    return contentBytes;
+    byte[] bytes = new byte[content.readableBytes()];
+    int readerIndex = content.readerIndex();
+    content.getBytes(readerIndex, bytes);
+    return bytes;
   }
 }

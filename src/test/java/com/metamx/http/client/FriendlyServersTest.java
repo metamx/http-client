@@ -21,23 +21,9 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.http.client.response.StatusResponseHandler;
 import com.metamx.http.client.response.StatusResponseHolder;
-import org.eclipse.jetty.server.Connector;
-import org.eclipse.jetty.server.HttpConfiguration;
-import org.eclipse.jetty.server.HttpConnectionFactory;
-import org.eclipse.jetty.server.SecureRequestCustomizer;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.jboss.netty.channel.ChannelException;
-import org.jboss.netty.handler.codec.http.HttpMethod;
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLHandshakeException;
+import io.netty.channel.ChannelException;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -48,6 +34,19 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Test;
 
 /**
  * Tests with servers that are at least moderately well-behaving.
@@ -71,7 +70,9 @@ public class FriendlyServersTest
                   BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                   OutputStream out = clientSocket.getOutputStream()
               ) {
-                while (!in.readLine().equals("")); // skip lines
+                while (!in.readLine().equals("")) {
+                  ; // skip lines
+                }
                 out.write("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nhello!".getBytes(Charsets.UTF_8));
               }
               catch (Exception e) {
@@ -92,7 +93,7 @@ public class FriendlyServersTest
               new StatusResponseHandler(Charsets.UTF_8)
           ).get();
 
-      Assert.assertEquals(200, response.getStatus().getCode());
+      Assert.assertEquals(200, response.getStatus().code());
       Assert.assertEquals("hello!", response.getContent());
     }
     finally {
@@ -123,7 +124,7 @@ public class FriendlyServersTest
                 // Read headers
                 String header;
                 while (!(header = in.readLine()).equals("")) {
-                  if (header.equals("Accept-Encoding: identity")) {
+                  if (header.toLowerCase().equals("Accept-Encoding: identity".toLowerCase())) {
                     foundAcceptEncoding.set(true);
                   }
                 }
@@ -149,7 +150,7 @@ public class FriendlyServersTest
               new StatusResponseHandler(Charsets.UTF_8)
           ).get();
 
-      Assert.assertEquals(200, response.getStatus().getCode());
+      Assert.assertEquals(200, response.getStatus().code());
       Assert.assertEquals("hello!", response.getContent());
       Assert.assertTrue(foundAcceptEncoding.get());
     }
@@ -199,17 +200,23 @@ public class FriendlyServersTest
       {
         final HttpResponseStatus status = trustingClient
             .go(
-                new Request(HttpMethod.GET, new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort()))),
+                new Request(
+                    HttpMethod.GET,
+                    new URL(String.format("https://localhost:%d/", sslConnector.getLocalPort()))
+                ),
                 new StatusResponseHandler(Charsets.UTF_8)
             ).get().getStatus();
-        Assert.assertEquals(404, status.getCode());
+        Assert.assertEquals(404, status.code());
       }
 
       // Incorrect name ("127.0.0.1")
       {
         final ListenableFuture<StatusResponseHolder> response1 = trustingClient
             .go(
-                new Request(HttpMethod.GET, new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort()))),
+                new Request(
+                    HttpMethod.GET,
+                    new URL(String.format("https://127.0.0.1:%d/", sslConnector.getLocalPort()))
+                ),
                 new StatusResponseHandler(Charsets.UTF_8)
             );
 
@@ -265,13 +272,13 @@ public class FriendlyServersTest
       final HttpClient client = HttpClientInit.createClient(config, lifecycle);
 
       {
-        final HttpResponseStatus status =client
+        final HttpResponseStatus status = client
             .go(
                 new Request(HttpMethod.GET, new URL("https://httpbin.org/get")),
                 new StatusResponseHandler(Charsets.UTF_8)
             ).get().getStatus();
 
-        Assert.assertEquals(200, status.getCode());
+        Assert.assertEquals(200, status.code());
       }
 
       {
@@ -282,7 +289,7 @@ public class FriendlyServersTest
                 new StatusResponseHandler(Charsets.UTF_8)
             ).get().getStatus();
 
-        Assert.assertEquals(200, status.getCode());
+        Assert.assertEquals(200, status.code());
       }
     }
     finally {

@@ -22,9 +22,9 @@ import com.metamx.common.lifecycle.Lifecycle;
 import com.metamx.http.client.response.StatusResponseHandler;
 import com.metamx.http.client.response.StatusResponseHolder;
 import java.io.IOException;
-import org.jboss.netty.channel.ChannelException;
-import org.jboss.netty.handler.codec.http.HttpMethod;
-import org.jboss.netty.handler.timeout.ReadTimeoutException;
+import io.netty.channel.ChannelException;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.timeout.ReadTimeoutException;
 import org.joda.time.Duration;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -305,16 +305,7 @@ public class JankyServersTest
               new StatusResponseHandler(Charsets.UTF_8)
           );
 
-      Throwable e = null;
-      try {
-        response.get();
-      }
-      catch (ExecutionException e1) {
-        e = e1.getCause();
-      }
-
-      Assert.assertTrue("IllegalArgumentException thrown by 'get'", e instanceof IllegalArgumentException);
-      Assert.assertTrue("Expected error message", e.getMessage().matches(".*invalid version format:.*"));
+      Assert.assertEquals(999, response.get().getStatus().code());
     }
     finally {
       lifecycle.stop();

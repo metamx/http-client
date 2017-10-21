@@ -16,24 +16,21 @@
 
 package com.metamx.http.client.netty;
 
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.DefaultChannelPipeline;
-import org.jboss.netty.handler.codec.http.HttpClientCodec;
-import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpClientCodec;
+import io.netty.handler.codec.http.HttpContentDecompressor;
 
 /**
  */
-public class HttpClientPipelineFactory implements ChannelPipelineFactory
+public class HttpClientPipelineFactory extends ChannelInitializer<SocketChannel>
 {
   @Override
-  public ChannelPipeline getPipeline() throws Exception
+  protected void initChannel(SocketChannel ch) throws Exception
   {
-    ChannelPipeline pipeline = new DefaultChannelPipeline();
-
+    ChannelPipeline pipeline = ch.pipeline();
     pipeline.addLast("codec", new HttpClientCodec());
     pipeline.addLast("inflater", new HttpContentDecompressor());
-
-    return pipeline;
   }
 }

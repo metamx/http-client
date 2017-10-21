@@ -16,8 +16,8 @@
 
 package com.metamx.http.client.response;
 
-import org.jboss.netty.handler.codec.http.HttpChunk;
-import org.jboss.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
 
 /**
  * A handler for an HTTP request.
@@ -45,7 +45,7 @@ public interface HttpResponseHandler<IntermediateType, FinalType>
    * @return
    */
   public ClientResponse<IntermediateType> handleResponse(HttpResponse response);
-  public ClientResponse<IntermediateType> handleChunk(ClientResponse<IntermediateType> clientResponse, HttpChunk chunk);
+  public ClientResponse<IntermediateType> handleChunk(ClientResponse<IntermediateType> clientResponse, HttpContent chunk);
   public ClientResponse<FinalType> done(ClientResponse<IntermediateType> clientResponse);
   public void exceptionCaught(ClientResponse<IntermediateType> clientResponse,Throwable e);
 }
